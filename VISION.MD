@@ -12,11 +12,25 @@ The system should feel like a native TV interface, not a Linux desktop.
 
 App will open files from local storage, giving me option to choose player (play with MCP/VLC), but trackingg progress via jellyfin.
 
+### Inspiration
+- **Jellyfin Android app** – Primary UX reference for comfortable, intuitive navigation and playback controls
+
 2 parts - both fullscreen kiosk mode (with closebutton)
     - home - for choosing custom media app / youtube / prime video etc
     - custom media app - for playing local movies and tracking progress with jellyfin
 
-Navigating to homepage app via some shortcuts
+### Home Screen Tiles (Hardcoded)
+- Custom Media App
+- YouTube
+- Disney+
+- Prime Video
+- Sweet.tv
+
+### Homepage Navigation
+- W3 airmouse homepage button triggers global key listener
+- Works from anywhere (including during playback)
+- Closes current kiosk instance and reopens home app
+- Already implemented; improvements deferred to Phase 2
 
 ## Based on current working setup
 
@@ -141,14 +155,23 @@ Czech (SDH)
 - OK → select and close
 - Back → close without change
 
-Playback continues uninterrupted.
+### Submenu Behavior
+- Playback pauses when audio/subtitle menu is open
+- Menu appears as overlay or modal (not full-screen)
+- Can be improved visually in Phase 2
 
 ---
 
-## Episode Control
+## Episode & Navigation Control
 - **Restart** → restart current item immediately
-- **Prev / Next** → handled via Jellyfin playlist logic
-- Disabled if not applicable
+- **Prev / Next** → handled via Jellyfin playlist logic; also reports watched state to Jellyfin
+- Disabled if not applicable (e.g., no next episode for movies)
+- Focus remains on disabled items; they are visually greyed out
+
+## Movie vs Show Distinction
+- **UI Selection Screen** → clearly shows whether item is movie or show
+- **Playback UI** → Prev/Next buttons disabled for movies (no next episode)
+- Behavior otherwise identical
 
 ---
 
@@ -167,13 +190,15 @@ Playback continues uninterrupted.
 
 ### Included
 - Electron launcher
-- Static home screen with tiles
+- Static home screen with hardcoded tiles (Custom App, YouTube, Disney+, Prime Video, Sweet.tv)
 - Jellyfin integration
 - MPV playback
 - VLC playback
 - Playback overlay (timeline + actions)
-- Audio & subtitle list selection
+- Audio & subtitle selection (paused overlay/menu)
+- Movie vs show distinction in selection UI
 - Remote-style navigation only
+- Global homepage button listener (already implemented)
 
 ### Explicitly Excluded
 - Android frontend
@@ -199,3 +224,4 @@ Playback continues uninterrupted.
 - Android device will use **native Jellyfin client**
 - Linux frontend may remain custom
 - Visual polish and animations are Phase 2
+- CSFD / IMDB ratings
