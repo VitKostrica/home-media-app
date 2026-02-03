@@ -12,6 +12,9 @@
 .home-header {
     padding: 40px 60px 20px;
     border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .home-header h1 {
@@ -60,7 +63,23 @@
         font-size: 2rem;
     }
 
-    .home-footer {
+    .close-button {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+    }
+
+    .close-button:hover {
+        color: #ff6b6b;
+        background: rgba(255, 107, 107, 0.1);
+        border-radius: 4px;
+    }
+
+    .footer {
         padding: 30px 50px;
     }
 }

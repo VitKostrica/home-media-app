@@ -40,6 +40,12 @@ const HOME_TILES: AppTile[] = [
         icon: '📺',
         description: 'Sweet.tv service',
     },
+    {
+        id: 'jellyfin',
+        title: 'Jellyfin',
+        icon: '🎥',
+        description: 'Personal media server',
+    },
 ]
 
 const HomeScreen: React.FC = () => {
@@ -47,7 +53,7 @@ const HomeScreen: React.FC = () => {
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
-            const cols = 5
+            const cols = 6
             const rows = 1
 
             switch (event.key) {
@@ -81,10 +87,16 @@ const HomeScreen: React.FC = () => {
         // TODO: Launch the selected app
     }
 
+    const handleClose = () => {
+        console.log('Closing app')
+        ;(window as any).electron.close()
+    }
+
     return (
         <div className="home-screen">
             <div className="home-header">
                 <h1>Home Media Center</h1>
+                <button className="close-button" onClick={handleClose} title="Close">✕</button>
             </div>
 
             <div className="tiles-grid">

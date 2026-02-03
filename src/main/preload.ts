@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('electron', {
+    close: () => ipcRenderer.invoke('app:close'),
     playerApi: {
         play: () => ipcRenderer.invoke('player:play'),
         pause: () => ipcRenderer.invoke('player:pause'),

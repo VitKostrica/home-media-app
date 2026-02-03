@@ -54,6 +54,12 @@ app.on('activate', () => {
 })
 
 // IPC handlers
+ipcMain.handle('app:close', () => {
+    if (mainWindow) {
+        mainWindow.close()
+    }
+})
+
 ipcMain.handle('player:play', () => {
     // TODO: Implement player communication
 })
