@@ -1,0 +1,212 @@
+/* ── Jellyfin Login ──────────────────────────────────────── */
+
+.jellyfin-login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    padding: 40px;
+}
+
+.login-card {
+    background: linear-gradient(145deg, #1c2245 0%, #0f1329 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 48px 56px;
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+
+.login-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.login-icon {
+    font-size: 3.5rem;
+    margin-bottom: 4px;
+}
+
+.login-title {
+    font-size: 1.8rem;
+    font-weight: 500;
+    margin: 0;
+    letter-spacing: 0.02em;
+}
+
+.login-subtitle {
+    font-size: 1rem;
+    opacity: 0.45;
+    margin: 0;
+}
+
+/* ── Error ──────────────────────────────────────────────── */
+
+.login-error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(244, 67, 54, 0.12);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 0.95rem;
+    color: #ef9a9a;
+    animation: errorShake 300ms ease;
+}
+
+.login-error-icon {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    background: rgba(244, 67, 54, 0.8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+
+/* ── Fields ─────────────────────────────────────────────── */
+
+.login-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 200ms ease;
+}
+
+.login-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    opacity: 0.5;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    transition: all 200ms ease;
+}
+
+.login-field.field-focused .login-label {
+    opacity: 0.9;
+    color: #42a5f5;
+}
+
+.login-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 1.15rem;
+    color: #fff;
+    outline: none;
+    transition: all 200ms ease;
+    font-family: inherit;
+}
+
+.login-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.login-input:focus {
+    border-color: #42a5f5;
+    background: rgba(66, 165, 245, 0.06);
+    box-shadow: 0 0 20px rgba(66, 165, 245, 0.15);
+}
+
+.login-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Submit Button ──────────────────────────────────────── */
+
+.login-submit {
+    background: rgba(66, 165, 245, 0.15);
+    border: 2px solid rgba(66, 165, 245, 0.4);
+    border-radius: 14px;
+    padding: 18px 24px;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: #42a5f5;
+    cursor: pointer;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    letter-spacing: 0.02em;
+    margin-top: 4px;
+}
+
+.login-submit:hover {
+    background: rgba(66, 165, 245, 0.25);
+    border-color: #42a5f5;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(66, 165, 245, 0.2);
+}
+
+.login-submit:focus,
+.login-submit.focused {
+    background: rgba(66, 165, 245, 0.25);
+    border-color: #42a5f5;
+    box-shadow: 0 0 24px rgba(66, 165, 245, 0.3);
+    color: #fff;
+}
+
+.login-submit:active {
+    transform: scale(0.98);
+}
+
+.login-submit:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Loading Spinner ────────────────────────────────────── */
+
+.login-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(66, 165, 245, 0.3);
+    border-top-color: #42a5f5;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Hint ───────────────────────────────────────────────── */
+
+.login-hint {
+    text-align: center;
+    font-size: 0.85rem;
+    opacity: 0.25;
+    margin: 0;
+}

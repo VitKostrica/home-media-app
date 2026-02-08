@@ -3,13 +3,21 @@
 export interface MediaItem {
     id: string
     title: string
-    type: 'movie' | 'episode'
-    thumbnail?: string
+    type: 'movie' | 'series' | 'episode'
+    year?: number
     posterUrl?: string
+    backdropUrl?: string
     overview?: string
-    duration?: number
+    duration?: number       // in seconds
     watched: boolean
-    resumePosition?: number
+    resumePosition?: number // in seconds
+    playedPercentage?: number
+    filePath?: string
+    // Series/episode specific
+    seriesName?: string
+    seasonName?: string
+    seasonNumber?: number
+    episodeNumber?: number
 }
 
 export interface AudioTrack {
@@ -38,8 +46,23 @@ export interface PlaybackState {
     availableSubtitles: SubtitleTrack[]
 }
 
+export type PlayerType = 'mpv' | 'vlc'
+
+export type AppScreen = 'home' | 'media-app'
+
+export interface AppConfig {
+    jellyfinUrl: string
+    jellyfinApiKey: string
+    jellyfinUserId: string
+    jellyfinUsername: string
+    mediaBasePath: string
+    defaultPlayer: PlayerType
+}
+
 export interface ElectronAPI {
+    close: () => Promise<void>
     playerApi: {
+        launch: (player: PlayerType, filePath: string, startPosition?: number) => Promise<{ success: boolean; error?: string }>
         play: () => Promise<void>
         pause: () => Promise<void>
         stop: () => Promise<void>
@@ -48,8 +71,17 @@ export interface ElectronAPI {
         selectSubtitle: (index: number) => Promise<void>
     }
     jellyfinApi: {
-        getLibrary: () => Promise<MediaItem[]>
-        updateProgress: (itemId: string, progress: number) => Promise<void>
+        authenticate: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+        getMovies: () => Promise<MediaItem[]>
+        getSeries: () => Promise<MediaItem[]>
+        getSeasons: (seriesId: string) => Promise<MediaItem[]>
+        getEpisodes: (seriesId: string, seasonId: string) => Promise<MediaItem[]>
+        reportProgress: (itemId: string, positionTicks: number) => Promise<void>
+        reportStopped: (itemId: string, positionTicks: number) => Promise<void>
+    }
+    configApi: {
+        get: () => Promise<AppConfig>
+        set: (config: Partial<AppConfig>) => Promise<void>
     }
 }
 

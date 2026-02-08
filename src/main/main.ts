@@ -1,5 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import * as configService from './services/config'
+import * as jellyfinService from './services/jellyfin'
+import * as playerService from './services/player'
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -53,17 +56,80 @@ app.on('activate', () => {
     }
 })
 
-// IPC handlers
+// ── App IPC ──────────────────────────────────────────────────
+
 ipcMain.handle('app:close', () => {
     if (mainWindow) {
         mainWindow.close()
     }
 })
 
-ipcMain.handle('player:play', () => {
-    // TODO: Implement player communication
+// ── Config IPC ───────────────────────────────────────────────
+
+ipcMain.handle('config:get', () => {
+    return configService.getConfig()
 })
 
-ipcMain.handle('jellyfin:get-library', async () => {
-    // TODO: Implement Jellyfin API call
+ipcMain.handle('config:set', (_, partial: Record<string, any>) => {
+    configService.setConfig(partial)
+})
+
+// ── Jellyfin IPC ─────────────────────────────────────────────
+
+ipcMain.handle('jellyfin:authenticate', async (_, username: string, password: string) => {
+    return await jellyfinService.authenticate(username, password)
+})
+
+ipcMain.handle('jellyfin:get-movies', async () => {
+    return await jellyfinService.getMovies()
+})
+
+ipcMain.handle('jellyfin:get-series', async () => {
+    return await jellyfinService.getSeries()
+})
+
+ipcMain.handle('jellyfin:get-seasons', async (_, seriesId: string) => {
+    return await jellyfinService.getSeasons(seriesId)
+})
+
+ipcMain.handle('jellyfin:get-episodes', async (_, seriesId: string, seasonId: string) => {
+    return await jellyfinService.getEpisodes(seriesId, seasonId)
+})
+
+ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTicks: number) => {
+    await jellyfinService.reportProgress(itemId, positionTicks)
+})
+
+ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTicks: number) => {
+    await jellyfinService.reportStopped(itemId, positionTicks)
+})
+
+// ── Player IPC ───────────────────────────────────────────────
+
+ipcMain.handle('player:launch', (_, type: string, filePath: string, startPosition?: number, jellyfinItemId?: string) => {
+    return playerService.launchPlayer(type as 'mpv' | 'vlc', filePath, startPosition, jellyfinItemId)
+})
+
+ipcMain.handle('player:stop', () => {
+    playerService.stopPlayer()
+})
+
+ipcMain.handle('player:play', () => {
+    // TODO: MPV/VLC IPC control (Phase 2)
+})
+
+ipcMain.handle('player:pause', () => {
+    // TODO: MPV/VLC IPC control (Phase 2)
+})
+
+ipcMain.handle('player:seek', (_, _position: number) => {
+    // TODO: MPV/VLC IPC control (Phase 2)
+})
+
+ipcMain.handle('player:audio-select', (_, _index: number) => {
+    // TODO: MPV/VLC IPC control (Phase 2)
+})
+
+ipcMain.handle('player:subtitle-select', (_, _index: number) => {
+    // TODO: MPV/VLC IPC control (Phase 2)
 })

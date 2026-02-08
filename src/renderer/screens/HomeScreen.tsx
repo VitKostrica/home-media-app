@@ -48,7 +48,11 @@ const HOME_TILES: AppTile[] = [
     },
 ]
 
-const HomeScreen: React.FC = () => {
+interface HomeScreenProps {
+    onNavigate?: (screen: string) => void
+}
+
+const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     const [focusedIndex, setFocusedIndex] = useState(0)
 
     useEffect(() => {
@@ -72,24 +76,29 @@ const HomeScreen: React.FC = () => {
                     break
                 case 'Backspace':
                     event.preventDefault()
-                    // TODO: Back button handler (exit app)
+                    // Back from home = close app
+                    handleClose()
                     break
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [focusedIndex])
+    }, [focusedIndex, onNavigate])
 
     const handleSelect = (index: number) => {
         const tile = HOME_TILES[index]
         console.log('Selected:', tile.id)
-        // TODO: Launch the selected app
+
+        if (tile.id === 'custom-media' && onNavigate) {
+            onNavigate('media-app')
+        }
+        // TODO: Handle other tiles (launch external apps)
     }
 
     const handleClose = () => {
         console.log('Closing app')
-        ;(window as any).electron.close()
+        window.electron?.close()
     }
 
     return (
@@ -107,6 +116,7 @@ const HomeScreen: React.FC = () => {
                         icon={tile.icon}
                         description={tile.description}
                         isFocused={index === focusedIndex}
+                        onClick={() => handleSelect(index)}
                     />
                 ))}
             </div>
