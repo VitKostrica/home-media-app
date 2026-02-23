@@ -49,6 +49,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [vlcPlayingItem, setVlcPlayingItem] = useState<MediaItem | null>(null)
     const [showPlayerSelect, setShowPlayerSelect] = useState<MediaItem | null>(null)
     const [selectedPlayerType, setSelectedPlayerType] = useState<'html5' | 'vlc'>('html5')
+    const [itemsCache, setItemsCache] = useState<{ [key: number]: MediaItem[] }>({})
 
     const gridRef = useRef<HTMLDivElement>(null)
 
@@ -80,6 +81,14 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }
 
     const fetchItems = async () => {
+        // Check cache first
+        if (itemsCache[activeTab]) {
+            setItems(itemsCache[activeTab])
+            setLoading(false)
+            setGridIndex(0)
+            return
+        }
+
         setLoading(true)
         setError(null)
         try {
@@ -90,6 +99,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 return
             }
 
+            let data: MediaItem[] = []
+
             if (activeTab === 0) {
                 // Continue Watching tab - show movies AND series with resume position
                 const [movies, series] = await Promise.all([
@@ -97,33 +108,36 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     api.getSeries(),
                 ])
 
-                // Combine movies and series, then filter for items with resume position
                 const allItems = [...(movies || []), ...(series || [])]
-                const continueList = allItems
-                    .filter(
-                        (item) =>
-                            item.resumePosition &&
-                            item.resumePosition > 0 &&
-                            item.playedPercentage &&
-                            item.playedPercentage > 0 &&
-                            item.playedPercentage < 100
-                    )
+                console.log('All items count:', allItems.length)
+                console.log('Sample items:', allItems.slice(0, 3).map(i => ({
+                    title: i.title,
+                    resumePosition: i.resumePosition,
+                    playedPercentage: i.playedPercentage,
+                    watched: i.watched,
+                })))
+
+                // Filter for items with resume position (any amount watched)
+                data = allItems
+                    .filter((item) => item.resumePosition && item.resumePosition > 0)
                     .sort(
                         (a, b) =>
                             (b.playedPercentage || 0) - (a.playedPercentage || 0)
                     )
-                    .slice(0, 24) // Limit to 24 items
+                    .slice(0, 24)
 
-                setItems(continueList)
+                console.log('Continue watching filtered count:', data.length)
             } else if (activeTab === 1) {
                 // Movies tab
-                const data = await api.getMovies()
-                setItems(data || [])
+                data = await api.getMovies()
             } else {
                 // Shows tab
-                const data = await api.getSeries()
-                setItems(data || [])
+                data = await api.getSeries()
             }
+
+            // Cache the results
+            setItemsCache(prev => ({ ...prev, [activeTab]: data }))
+            setItems(data || [])
             setGridIndex(0)
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Failed to load library'
