@@ -36,17 +36,20 @@ function formatTime(totalSeconds: number): string {
 
 const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     // State
-    const [activeTab, setActiveTab] = useState<number>(0) // 0 = Movies, 1 = Shows
+    const [activeTab, setActiveTab] = useState<number>(0) // 0 = Continue Watching, 1 = Movies, 2 = Shows
     const [items, setItems] = useState<MediaItem[]>([])
+    const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
     const [loading, setLoading] = useState<boolean>(true)
     const [error, setError] = useState<string | null>(null)
     const [gridIndex, setGridIndex] = useState<number>(0)
     const [showDetail, setShowDetail] = useState<boolean>(false)
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
-    const [playerBtnIndex, setPlayerBtnIndex] = useState<number>(0) // 0 = MPV, 1 = VLC
+    const [playerBtnIndex, setPlayerBtnIndex] = useState<number>(0) // 0 = HTML5, 1 = VLC
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
     const [playingItem, setPlayingItem] = useState<MediaItem | null>(null)
     const [vlcPlayingItem, setVlcPlayingItem] = useState<MediaItem | null>(null)
+    const [showPlayerSelect, setShowPlayerSelect] = useState<MediaItem | null>(null)
+    const [selectedPlayerType, setSelectedPlayerType] = useState<'html5' | 'vlc'>('html5')
 
     const gridRef = useRef<HTMLDivElement>(null)
 
@@ -87,16 +90,88 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 setLoading(false)
                 return
             }
-            const data = activeTab === 0
-                ? await api.getMovies()
-                : await api.getSeries()
-            setItems(data || [])
+
+            if (activeTab === 0) {
+                // Continue Watching tab
+                const [movies, series] = await Promise.all([
+                    api.getMovies(),
+                    api.getSeries(),
+                ])
+                const continueList = [...(movies || []), ...(series || [])]
+                    .filter(
+                        (item) =>
+                            item.watched === false &&
+                            item.resumePosition &&
+                            item.resumePosition > 0 &&
+                            item.playedPercentage &&
+                            item.playedPercentage < 90
+                    )
+                    .sort(
+                        (a, b) =>
+                            (new Date(b.watched).getTime() || 0) -
+                            (new Date(a.watched).getTime() || 0)
+                    )
+                setContinueWatchingItems(continueList)
+                setItems(continueList)
+            } else if (activeTab === 1) {
+                // Movies tab
+                const data = await api.getMovies()
+                setItems(data || [])
+            } else {
+                // Shows tab
+                const data = await api.getSeries()
+                setItems(data || [])
+            }
             setGridIndex(0)
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Failed to load library'
             setError(message)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handlePlayClick = (item: MediaItem) => {
+        setSelectedItem(item)
+        setShowPlayerSelect(item)
+        setPlayerBtnIndex(0)
+    }
+
+    const playWithPlayer = async (item: MediaItem, playerType: 'html5' | 'vlc') => {
+        if (!item.filePath) {
+            console.warn('No file path for selected item')
+            return
+        }
+        try {
+            if (playerType === 'html5') {
+                // Use embedded HTML5 player
+                setPlayingItem(item)
+                setShowPlayerSelect(null)
+                setShowDetail(false)
+            } else if (playerType === 'vlc') {
+                // Launch VLC as fullscreen overlay
+                const startPosition = item.resumePosition
+                    ? Math.floor(item.resumePosition / 10000000)
+                    : 0
+
+                const result = await window.electron?.playerApi?.launch(
+                    'vlc',
+                    item.filePath,
+                    startPosition,
+                    item.id
+                )
+
+                if (result?.success) {
+                    setVlcPlayingItem(item)
+                    setShowPlayerSelect(null)
+                    setShowDetail(false)
+                } else {
+                    alert(`Failed to launch VLC: ${result?.error || 'Unknown error'}`)
+                }
+            }
+        } catch (err) {
+            console.error('Failed to launch player:', err)
+            alert('Error launching player')
         }
     }
 
@@ -177,6 +252,28 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
             event.preventDefault()
 
+            // Player selection modal
+            if (showPlayerSelect) {
+                switch (event.key) {
+                    case 'ArrowLeft':
+                        setPlayerBtnIndex(0)
+                        setSelectedPlayerType('html5')
+                        break
+                    case 'ArrowRight':
+                        setPlayerBtnIndex(1)
+                        setSelectedPlayerType('vlc')
+                        break
+                    case 'Enter':
+                    case ' ':
+                        playWithPlayer(showPlayerSelect, selectedPlayerType)
+                        break
+                    case 'Backspace':
+                        setShowPlayerSelect(null)
+                        break
+                }
+                return
+            }
+
             // Detail overlay mode
             if (showDetail) {
                 switch (event.key) {
@@ -240,7 +337,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [gridIndex, items, showDetail, playerBtnIndex, handlePlay, onNavigate, isAuthenticated, playingItem, vlcPlayingItem])
+    }, [gridIndex, items, showDetail, playerBtnIndex, handlePlay, onNavigate, isAuthenticated, playingItem, vlcPlayingItem, showPlayerSelect, selectedPlayerType, playWithPlayer])
 
     // Scroll focused card into view
     useEffect(() => {
@@ -309,11 +406,17 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     className={`category-tab ${activeTab === 0 ? 'active' : ''}`}
                     onClick={() => handleTabSwitch(0)}
                 >
-                    Movies
+                    Continue Watching
                 </button>
                 <button
                     className={`category-tab ${activeTab === 1 ? 'active' : ''}`}
                     onClick={() => handleTabSwitch(1)}
+                >
+                    Movies
+                </button>
+                <button
+                    className={`category-tab ${activeTab === 2 ? 'active' : ''}`}
+                    onClick={() => handleTabSwitch(2)}
                 >
                     Shows
                 </button>
@@ -377,6 +480,37 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     </div>
                 )}
             </div>
+
+            {/* Player Selection Modal */}
+            {showPlayerSelect && (
+                <div className="player-select-modal" onClick={() => setShowPlayerSelect(null)}>
+                    <div className="player-select-content" onClick={(e) => e.stopPropagation()}>
+                        <h2>Select Player</h2>
+                        <p className="player-select-title">{showPlayerSelect.title}</p>
+                        <div className="player-buttons">
+                            <button
+                                className={`player-btn ${selectedPlayerType === 'html5' ? 'focused' : ''}`}
+                                onClick={() => playWithPlayer(showPlayerSelect, 'html5')}
+                            >
+                                <span className="player-icon">🎬</span>
+                                <span className="player-name">HTML5 Player</span>
+                                <span className="player-desc">Embedded in app</span>
+                            </button>
+                            <button
+                                className={`player-btn ${selectedPlayerType === 'vlc' ? 'focused' : ''}`}
+                                onClick={() => playWithPlayer(showPlayerSelect, 'vlc')}
+                            >
+                                <span className="player-icon">▶</span>
+                                <span className="player-name">VLC Player</span>
+                                <span className="player-desc">Fullscreen overlay</span>
+                            </button>
+                        </div>
+                        <p className="player-select-hint">
+                            Use arrow keys to select • Enter to play • Backspace to close
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Detail Overlay */}
             {showDetail && selectedItem && (

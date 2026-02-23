@@ -1,13 +1,12 @@
 import React, { useState } from 'react'
 import './App.css'
 import HomeScreen from './screens/HomeScreen'
-import ContinueWatchingScreen from './screens/ContinueWatchingScreen'
 import MediaAppScreen from './screens/MediaAppScreen'
 
-type Screen = 'home' | 'continue-watching' | 'media-app'
+type Screen = 'home' | 'media-app'
 
 const App: React.FC = () => {
-    const [currentScreen, setCurrentScreen] = useState<Screen>('continue-watching')
+    const [currentScreen, setCurrentScreen] = useState<Screen>('home')
 
     const handleNavigate = (screen: string) => {
         setCurrentScreen(screen as Screen)
@@ -16,12 +15,10 @@ const App: React.FC = () => {
     switch (currentScreen) {
         case 'home':
             return <HomeScreen onNavigate={handleNavigate} />
-        case 'continue-watching':
-            return <ContinueWatchingScreen onNavigate={handleNavigate} />
         case 'media-app':
             return <MediaAppScreen onNavigate={handleNavigate} />
         default:
-            return <ContinueWatchingScreen onNavigate={handleNavigate} />
+            return <HomeScreen onNavigate={handleNavigate} />
     }
 }
 

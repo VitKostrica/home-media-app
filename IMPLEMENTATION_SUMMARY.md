@@ -1,99 +1,101 @@
-# Home Media App - Core Issues Fix Summary
+# Home Media App - Implementation Summary
 
-## Issues Resolved
-
-### 1. ✅ Embedded Video Player
-**Problem**: Players (MPV/VLC) were opening in background windows instead of being embedded in the app.
-
-**Solution**:
-- Created a new **VideoPlayer component** (`src/renderer/components/VideoPlayer.tsx`) that uses HTML5 `<video>` element
-- Fully embedded within the Electron window with overlay controls
-- Features:
-  - Play/Pause with Space key
-  - Seek forward/backward with arrow keys (±10 seconds)
-  - Volume control with Up/Down arrows
-  - Mute toggle (M key)
-  - Auto-hiding controls after 3 seconds of inactivity
-  - Time display (current/duration)
-  - Keyboard hints overlay
-  - Progress reporting to Jellyfin every 5 seconds
-
-**Implementation**:
-- Updated `MediaAppScreen.tsx` to use VideoPlayer instead of launching external processes
-- Added `VideoPlayer.css` with modern control styling
-- Removed external player launches while maintaining player type selection UI
-
-### 2. ✅ New "Continue Watching" Home Screen
-**Problem**: App lacked a dedicated home screen with continue watching and next episodes features.
-
-**Solution**:
-- Created **ContinueWatchingScreen** (`src/renderer/screens/ContinueWatchingScreen.tsx`)
-- Now the default app window on launch
-- Features:
-  - "Continue Watching" row: Shows partially watched items with resume position
-  - "Up Next & New" row: Shows unwatched content
-  - Two-row grid navigation with Up/Down to switch between rows
-  - Left/Right navigation within rows
-  - Space/Enter to play, Backspace to go back
-  - Progress tracking display
-  - Jellyfin integration for fetching both movies and series
-
-**Styling**:
-- Modern dark gradient background
-- Responsive grid layout (6 columns by default)
-- Focused row highlighting with drop-shadow effect
-- Smooth opacity transitions between rows
-- Custom scrollbar styling
-
-## App Navigation Structure
+## App Structure
 
 ```
-Home Media App
-├── Home Screen (from home tile)
-├── Continue Watching Screen (default on launch) ← NEW
-│   ├── Continue Watching row
-│   ├── Up Next & New row
-│   └── Embedded Video Player
-├── Media App Screen (from home or app tiles)
-│   ├── Movies/Shows tabs
-│   └── Embedded Video Player
-└── Jellyfin Login (shown when not authenticated)
+Home Screen (DEFAULT)
+├── App Selection Tiles
+│   ├── Custom Media (→ Media App)
+│   ├── YouTube
+│   ├── Disney+
+│   ├── Prime Video
+│   ├── Sweet.tv
+│   └── Jellyfin
+│
+Media App Screen
+├── Tab 1: Continue Watching (Items with resume position)
+├── Tab 2: Movies (All movies)
+├── Tab 3: Shows (All series)
+│
+└── Player Selection Modal (when media selected)
+    ├── HTML5 Player (Embedded)
+    └── VLC Player (Fullscreen overlay)
 ```
 
-## Technical Changes
+## Features Implemented
 
-### New Files Created:
-1. `src/renderer/components/VideoPlayer.tsx` - Embedded video player component
-2. `src/renderer/screens/ContinueWatchingScreen.tsx` - Continue watching home screen
-3. `src/renderer/styles/VideoPlayer.css` - Video player styling
-4. `src/renderer/styles/ContinueWatchingScreen.css` - Continue watching screen styling
+### 1. ✅ Continue Watching Tab
+- Integrated into Media App as Tab 1 (default)
+- Filters items with partial progress (0-90% watched)
+- Shows resume position and progress bar
+- Navigable alongside Movies and Shows
 
-### Modified Files:
-1. `src/renderer/App.tsx` - Updated navigation to default to continue-watching
-2. `src/renderer/screens/MediaAppScreen.tsx` - Integrated VideoPlayer component
-3. `src/renderer/components/MediaCard.tsx` - Made props more flexible
+### 2. ✅ Dual Player Options
+- **HTML5 Player**: Embedded in app window with full controls
+- **VLC Player**: Fullscreen overlay for external playback
+- Player selection modal on every media selection
+- Keyboard navigation through options
 
-### Key Features:
-- **Embedded playback**: No external player windows
-- **Native HTML5 video**: Better performance and control
-- **Seamless integration**: Video player overlays on the app window
-- **Progress tracking**: Automatic Jellyfin integration
-- **Remote-friendly**: Full keyboard/remote control support
+### 3. ✅ Navigation Flow
+- Home Screen: App tiles → Select "Custom Media"
+- Media App: Three tabs with keyboard nav
+- Tab switching: Left/Right arrows (when not in detail view)
+- Media selection: Up/Down/Left/Right arrows
+- Player selection: Left/Right to choose player
 
 ## Controls
-- **Arrow Keys**: Navigate between media items
-- **Space/Enter**: Play selected media
-- **Backspace**: Go back to previous screen
-- **In Video Player**:
-  - Space: Play/Pause
-  - ←/→: Seek ±10 seconds
-  - ↑/↓: Volume control
-  - M: Mute toggle
-  - Backspace: Close player
 
-## Testing Recommendations
-1. Test continue watching row population with partially watched items
-2. Verify video playback with different media formats
-3. Check progress reporting to Jellyfin during playback
-4. Test navigation between all screens
-5. Verify responsive grid layout on target display size
+### Main Navigation
+- **↑/↓/←/→**: Navigate grid
+- **Space/Enter**: Select media
+- **Backspace**: Back to previous screen
+
+### Tab Navigation
+- From grid view: Cannot navigate tabs (focused on media)
+- Switch tabs via mouse or go back and re-enter
+
+### Player Selection Modal
+- **←/→**: Switch between HTML5 and VLC
+- **Space/Enter**: Play with selected player
+- **Backspace**: Cancel and return to media browser
+
+### Video Playback
+**HTML5 Player:**
+- **Space**: Play/Pause
+- **←/→**: Seek ±10 seconds
+- **↑/↓**: Volume control
+- **M**: Mute toggle
+- **Backspace**: Close player
+
+**VLC Player:**
+- **Backspace**: Close VLC and return to app
+
+## Key Changes from Previous Version
+
+| Before | Now |
+|--------|-----|
+| Continue Watching = Default home screen | Continue Watching = First tab in Media App |
+| Home screen unavailable | Home screen is default (app tiles) |
+| N/A | Player selection modal on every media pick |
+| One player choice in detail | Two player buttons in modal |
+
+## File Structure
+```
+src/
+├── renderer/
+│   ├── screens/
+│   │   ├── HomeScreen.tsx (App tiles)
+│   │   └── MediaAppScreen.tsx (Tabs + Player selection)
+│   ├── components/
+│   │   ├── VideoPlayer.tsx (HTML5 player)
+│   │   └── MediaCard.tsx
+│   └── styles/
+│       ├── MediaAppScreen.css (+ Player selection modal)
+│       └── VideoPlayer.css
+└── types/
+    └── index.ts
+```
+
+## Build Status
+✅ Build successful - No TypeScript errors
+✅ All features compiled and ready for testing
