@@ -32,4 +32,8 @@ contextBridge.exposeInMainWorld('electron', {
         get: () => ipcRenderer.invoke('config:get'),
         set: (config: Record<string, any>) => ipcRenderer.invoke('config:set', config),
     },
+
+    fileApi: {
+        getLocalImagePath: (itemId: string) => ipcRenderer.invoke('file:get-local-image', itemId),
+    },
 })

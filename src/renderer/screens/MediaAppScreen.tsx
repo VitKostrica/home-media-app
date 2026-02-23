@@ -117,9 +117,13 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     watched: i.watched,
                 })))
 
-                // Filter for items with resume position (any amount watched)
+                // Filter for continue watching: items with ANY playback progress or partially watched
+                // This includes movies/shows you've started or are currently watching
                 data = allItems
-                    .filter((item) => item.resumePosition && item.resumePosition > 0)
+                    .filter((item) =>
+                        (item.playedPercentage && item.playedPercentage > 0 && item.playedPercentage < 100) ||
+                        (item.resumePosition && item.resumePosition > 0)
+                    )
                     .sort(
                         (a, b) =>
                             (b.playedPercentage || 0) - (a.playedPercentage || 0)

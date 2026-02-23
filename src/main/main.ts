@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import * as fs from 'fs'
 import * as configService from './services/config'
 import * as jellyfinService from './services/jellyfin'
 import * as playerService from './services/player'
@@ -132,4 +133,33 @@ ipcMain.handle('player:audio-select', (_, _index: number) => {
 
 ipcMain.handle('player:subtitle-select', (_, _index: number) => {
     // TODO: MPV/VLC IPC control (Phase 2)
+})
+
+// ── File IPC ─────────────────────────────────────────────────
+
+ipcMain.handle('file:get-local-image', async (_, itemId: string) => {
+    const config = configService.getConfig()
+    if (!config.mediaBasePath) {
+        return null
+    }
+
+    // Try common metadata directory structures for Jellyfin
+    const possiblePaths = [
+        path.join(config.mediaBasePath, 'metadata', itemId, 'poster.jpg'),
+        path.join(config.mediaBasePath, 'metadata', itemId, 'thumb.jpg'),
+        path.join(config.mediaBasePath, 'metadata', itemId + '_poster.jpg'),
+        path.join(config.mediaBasePath, 'metadata', itemId + '_thumb.jpg'),
+    ]
+
+    for (const imagePath of possiblePaths) {
+        try {
+            if (fs.existsSync(imagePath)) {
+                return imagePath
+            }
+        } catch (err) {
+            console.error('Error checking image path:', imagePath, err)
+        }
+    }
+
+    return null
 })

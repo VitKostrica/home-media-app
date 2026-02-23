@@ -160,7 +160,7 @@ export async function getMovies(): Promise<MappedItem[]> {
             params: {
                 IncludeItemTypes: 'Movie',
                 Recursive: true,
-                Fields: 'Overview,Path,MediaSources',
+                Fields: 'Overview,Path,MediaSources,UserData',
                 SortBy: 'SortName',
                 SortOrder: 'Ascending',
             },
@@ -182,7 +182,7 @@ export async function getSeries(): Promise<MappedItem[]> {
             params: {
                 IncludeItemTypes: 'Series',
                 Recursive: true,
-                Fields: 'Overview,Path',
+                Fields: 'Overview,Path,UserData',
                 SortBy: 'SortName',
                 SortOrder: 'Ascending',
             },
@@ -203,7 +203,7 @@ export async function getSeasons(seriesId: string): Promise<MappedItem[]> {
         const response = await api.get(`/Shows/${seriesId}/Seasons`, {
             params: {
                 UserId: userId,
-                Fields: 'Overview',
+                Fields: 'Overview,UserData',
             },
             headers: getHeaders(),
         })
@@ -226,7 +226,7 @@ export async function getEpisodes(
             params: {
                 UserId: userId,
                 SeasonId: seasonId,
-                Fields: 'Overview,Path,MediaSources',
+                Fields: 'Overview,Path,MediaSources,UserData',
             },
             headers: getHeaders(),
         })
