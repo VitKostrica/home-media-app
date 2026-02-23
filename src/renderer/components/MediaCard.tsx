@@ -14,11 +14,12 @@ interface MediaCardItem {
 
 interface MediaCardProps {
     item: MediaCardItem
-    isFocused: boolean
-    onSelect: () => void
+    isFocused?: boolean
+    onSelect?: () => void
+    showProgress?: boolean
 }
 
-const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused, onSelect }) => {
+const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect, showProgress = true }) => {
     const [imgFailed, setImgFailed] = useState(false)
 
     return (
@@ -47,7 +48,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused, onSelect }) => {
                 )}
 
                 {/* Progress bar overlay at bottom of poster */}
-                {(item.playedPercentage || 0) > 0 && !item.watched && (
+                {showProgress && (item.playedPercentage || 0) > 0 && !item.watched && (
                     <div className="media-card-progress">
                         <div
                             className="media-card-progress-fill"

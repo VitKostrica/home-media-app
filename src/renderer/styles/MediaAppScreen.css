@@ -9,6 +9,57 @@
     color: #fff;
 }
 
+/* VLC Playing Overlay */
+.vlc-playing-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.vlc-playing-content {
+    text-align: center;
+    color: #fff;
+}
+
+.vlc-playing-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    opacity: 0.8;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 0.8;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+.vlc-playing-title {
+    font-size: 24px;
+    margin: 0 0 20px 0;
+}
+
+.vlc-playing-hint {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0;
+}
+
 /* ── Header ─────────────────────────────────────────────── */
 
 .media-app-header {
@@ -155,7 +206,9 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .retry-button {
@@ -194,6 +247,7 @@
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -217,6 +271,7 @@
         opacity: 0;
         transform: scale(0.95) translateY(20px);
     }
+
     to {
         opacity: 1;
         transform: scale(1) translateY(0);
