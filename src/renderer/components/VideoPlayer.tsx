@@ -63,8 +63,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         // Convert file path for file:// protocol if needed
         const videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
+        console.log('VideoPlayer: Setting video source:', videoSource)
+        console.log('VideoPlayer: Start position:', startPosition)
+
         video.src = videoSource
         video.currentTime = startPosition
+
+        // Try to play immediately
+        video.play().catch((err) => {
+            console.error('Failed to play video:', err)
+        })
 
         const handlePlay = () => setIsPlaying(true)
         const handlePause = () => setIsPlaying(false)

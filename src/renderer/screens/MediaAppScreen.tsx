@@ -100,16 +100,15 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 const continueList = [...(movies || []), ...(series || [])]
                     .filter(
                         (item) =>
-                            item.watched === false &&
                             item.resumePosition &&
                             item.resumePosition > 0 &&
                             item.playedPercentage &&
-                            item.playedPercentage < 90
+                            item.playedPercentage > 0 &&
+                            item.playedPercentage < 100
                     )
                     .sort(
                         (a, b) =>
-                            (new Date(b.watched).getTime() || 0) -
-                            (new Date(a.watched).getTime() || 0)
+                            (b.playedPercentage || 0) - (a.playedPercentage || 0)
                     )
                 setContinueWatchingItems(continueList)
                 setItems(continueList)
@@ -137,14 +136,23 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         setPlayerBtnIndex(0)
     }
 
-    const playWithPlayer = async (item: MediaItem, playerType: 'html5' | 'vlc') => {
+    const playWithPlayer = useCallback(async (item: MediaItem, playerType: 'html5' | 'vlc') => {
+        console.log('Playing item:', item)
+        console.log('File path:', item.filePath)
+        console.log('Resume position:', item.resumePosition)
+
         if (!item.filePath) {
             console.warn('No file path for selected item')
+            alert('No file path available for this item')
             return
         }
         try {
             if (playerType === 'html5') {
                 // Use embedded HTML5 player
+                console.log('Starting HTML5 player with:', {
+                    filePath: item.filePath,
+                    startPosition: item.resumePosition ? Math.floor(item.resumePosition / 10000000) : 0,
+                })
                 setPlayingItem(item)
                 setShowPlayerSelect(null)
                 setShowDetail(false)
@@ -154,12 +162,20 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     ? Math.floor(item.resumePosition / 10000000)
                     : 0
 
+                console.log('Launching VLC with:', {
+                    filePath: item.filePath,
+                    startPosition,
+                    itemId: item.id,
+                })
+
                 const result = await window.electron?.playerApi?.launch(
                     'vlc',
                     item.filePath,
                     startPosition,
                     item.id
                 )
+
+                console.log('VLC launch result:', result)
 
                 if (result?.success) {
                     setVlcPlayingItem(item)
@@ -173,7 +189,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             console.error('Failed to launch player:', err)
             alert('Error launching player')
         }
-    }
+    }, [])
 
     const handlePlay = useCallback(async (playerType: 'html5' | 'vlc') => {
         if (!selectedItem?.filePath) {
@@ -456,6 +472,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         <h2>No items found</h2>
                         <p className="state-hint">
                             {activeTab === 0
+                                ? 'No items in continue watching'
+                                : activeTab === 1
                                 ? 'No movies in your Jellyfin library'
                                 : 'No shows in your Jellyfin library'}
                         </p>
