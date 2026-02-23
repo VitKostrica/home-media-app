@@ -264,6 +264,23 @@
     display: none;
 }
 
+/* ── Media Section (for Continue Watching + Next Episodes) */
+
+.media-section {
+    margin-bottom: 50px;
+}
+
+.section-title {
+    font-size: 1.3rem;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid rgba(66, 165, 245, 0.6);
+    padding-bottom: 12px;
+}
+
 /* ── Media Grid ─────────────────────────────────────────── */
 
 .media-grid {

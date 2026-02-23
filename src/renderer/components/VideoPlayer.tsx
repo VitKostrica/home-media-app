@@ -61,18 +61,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const video = videoRef.current
         if (!video) return
 
-        // Convert file path for file:// protocol if needed
-        const videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
-        console.log('VideoPlayer: Setting video source:', videoSource)
-        console.log('VideoPlayer: Start position:', startPosition)
+        const initializeVideo = async () => {
+            let videoSource = filePath
 
-        video.src = videoSource
-        video.currentTime = startPosition
+            // Try to use Jellyfin stream endpoint if we have the item ID
+            if (jellyfinItemId) {
+                try {
+                    const config = await window.electron?.configApi?.get()
+                    if (config?.jellyfinUrl && config?.jellyfinApiKey) {
+                        // Use Jellyfin's stream endpoint
+                        videoSource = `${config.jellyfinUrl}/Videos/${jellyfinItemId}/stream?api_key=${config.jellyfinApiKey}&mediaSourceId=default`
+                        console.log('VideoPlayer: Using Jellyfin stream:', videoSource)
+                    }
+                } catch (err) {
+                    console.error('Failed to get Jellyfin config, falling back to file path:', err)
+                    // Fall back to file path
+                    videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
+                }
+            } else {
+                // No item ID, use file path
+                videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
+            }
 
-        // Try to play immediately
-        video.play().catch((err) => {
-            console.error('Failed to play video:', err)
-        })
+            console.log('VideoPlayer: Setting video source:', videoSource)
+            console.log('VideoPlayer: Start position:', startPosition)
+
+            video.src = videoSource
+            video.currentTime = startPosition
+
+            // Try to play immediately
+            try {
+                await video.play()
+            } catch (err) {
+                console.error('Failed to play video:', err)
+            }
+        }
+
+        initializeVideo()
 
         const handlePlay = () => setIsPlaying(true)
         const handlePause = () => setIsPlaying(false)
@@ -105,7 +130,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             video.removeEventListener('ended', handleEnded)
             window.removeEventListener('keydown', handleKeyDown)
         }
-    }, [filePath, startPosition, onEnded])
+    }, [filePath, startPosition, onEnded, jellyfinItemId])
 
     const handlePlayerKeydown = (e: KeyboardEvent) => {
         resetControlsTimeout()

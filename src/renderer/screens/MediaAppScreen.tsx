@@ -39,6 +39,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [activeTab, setActiveTab] = useState<number>(0) // 0 = Continue Watching, 1 = Movies, 2 = Shows
     const [items, setItems] = useState<MediaItem[]>([])
     const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
+    const [nextEpisodesItems, setNextEpisodesItems] = useState<MediaItem[]>([])
     const [loading, setLoading] = useState<boolean>(true)
     const [error, setError] = useState<string | null>(null)
     const [gridIndex, setGridIndex] = useState<number>(0)
@@ -92,12 +93,32 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             }
 
             if (activeTab === 0) {
-                // Continue Watching tab
-                const [movies, series] = await Promise.all([
+                // Continue Watching tab - need episodes for shows, movies for movies
+                const [movies, allSeries] = await Promise.all([
                     api.getMovies(),
                     api.getSeries(),
                 ])
-                const continueList = [...(movies || []), ...(series || [])]
+
+                // For shows, we need to get episodes to find watched ones
+                let episodes: any[] = []
+                if (allSeries && allSeries.length > 0) {
+                    for (const series of allSeries) {
+                        try {
+                            const seasons = await api.getSeasons(series.id)
+                            for (const season of seasons || []) {
+                                const seasonEpisodes = await api.getEpisodes(series.id, season.id)
+                                episodes = episodes.concat(seasonEpisodes || [])
+                            }
+                        } catch (err) {
+                            console.error('Error fetching episodes for series:', series.id, err)
+                        }
+                    }
+                }
+
+                const allItems = [...(movies || []), ...episodes]
+
+                // Continue watching - items with resume position > 0 and < 100%
+                const continueList = allItems
                     .filter(
                         (item) =>
                             item.resumePosition &&
@@ -110,8 +131,30 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         (a, b) =>
                             (b.playedPercentage || 0) - (a.playedPercentage || 0)
                     )
+                    .slice(0, 12) // Limit to 12 items
+
+                // Next episodes - unwatched episodes or first episodes of series
+                const nextList = allItems
+                    .filter(
+                        (item) =>
+                            !item.watched &&
+                            (!item.resumePosition || item.resumePosition === 0 || item.playedPercentage === 0)
+                    )
+                    .sort((a, b) => {
+                        // Sort by series name, then episode number
+                        if (a.seriesName !== b.seriesName) {
+                            return (a.seriesName || '').localeCompare(b.seriesName || '')
+                        }
+                        const aSeason = a.seasonNumber || 0
+                        const bSeason = b.seasonNumber || 0
+                        if (aSeason !== bSeason) return aSeason - bSeason
+                        return (a.episodeNumber || 0) - (b.episodeNumber || 0)
+                    })
+                    .slice(0, 12) // Limit to 12 items
+
                 setContinueWatchingItems(continueList)
-                setItems(continueList)
+                setNextEpisodesItems(nextList)
+                setItems([...continueList, ...nextList]) // Combine for grid display
             } else if (activeTab === 1) {
                 // Movies tab
                 const data = await api.getMovies()
@@ -480,8 +523,59 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     </div>
                 )}
 
-                {/* Media Grid */}
-                {!loading && !error && items.length > 0 && (
+                {/* Continue Watching + Next Episodes (Two-row layout for tab 0) */}
+                {!loading && !error && isAuthenticated && activeTab === 0 && items.length > 0 && (
+                    <div>
+                        {/* Continue Watching Row */}
+                        {continueWatchingItems.length > 0 && (
+                            <div className="media-section">
+                                <h2 className="section-title">Continue Watching</h2>
+                                <div className="media-grid">
+                                    {continueWatchingItems.map((item, index) => (
+                                        <MediaCard
+                                            key={item.id}
+                                            item={item}
+                                            isFocused={index === gridIndex && gridIndex < continueWatchingItems.length}
+                                            onSelect={() => {
+                                                setSelectedItem(item)
+                                                setShowDetail(true)
+                                                setPlayerBtnIndex(0)
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Next Episodes Row */}
+                        {nextEpisodesItems.length > 0 && (
+                            <div className="media-section">
+                                <h2 className="section-title">Next Episodes & New</h2>
+                                <div className="media-grid">
+                                    {nextEpisodesItems.map((item, index) => (
+                                        <MediaCard
+                                            key={item.id}
+                                            item={item}
+                                            isFocused={
+                                                continueWatchingItems.length > 0 &&
+                                                index === gridIndex - continueWatchingItems.length &&
+                                                gridIndex >= continueWatchingItems.length
+                                            }
+                                            onSelect={() => {
+                                                setSelectedItem(item)
+                                                setShowDetail(true)
+                                                setPlayerBtnIndex(0)
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Media Grid (for Movies and Shows tabs) */}
+                {!loading && !error && isAuthenticated && activeTab !== 0 && items.length > 0 && (
                     <div className="media-grid">
                         {items.map((item, index) => (
                             <MediaCard
