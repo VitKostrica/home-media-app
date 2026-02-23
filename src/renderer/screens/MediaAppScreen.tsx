@@ -91,11 +91,15 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             }
 
             if (activeTab === 0) {
-                // Continue Watching tab - show movies with resume position
-                const movies = await api.getMovies()
+                // Continue Watching tab - show movies AND series with resume position
+                const [movies, series] = await Promise.all([
+                    api.getMovies(),
+                    api.getSeries(),
+                ])
 
-                // Continue watching - movies with resume position > 0 and < 100%
-                const continueList = (movies || [])
+                // Combine movies and series, then filter for items with resume position
+                const allItems = [...(movies || []), ...(series || [])]
+                const continueList = allItems
                     .filter(
                         (item) =>
                             item.resumePosition &&
