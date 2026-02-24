@@ -30,7 +30,6 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
             <div className="media-card-poster">
                 {item.posterUrl && !imgFailed ? (
                     <LazyImage
-                        key={item.posterUrl}
                         src={item.posterUrl}
                         alt={item.title}
                         onError={() => setImgFailed(true)}
