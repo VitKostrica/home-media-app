@@ -83,6 +83,47 @@
     overflow-y: auto;
 }
 
+/* ── Continue Watching Section ────────────────────────────── */
+
+.continue-watching-section {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.continue-label {
+    color: #999;
+    font-size: 12px;
+    text-transform: uppercase;
+    margin: 0 0 8px 0;
+}
+
+.continue-button {
+    background-color: #0066cc;
+    color: #fff;
+    border: 2px solid #0066cc;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.continue-button:hover,
+.continue-button:focus {
+    background-color: #0052a3;
+    border-color: #0052a3;
+    box-shadow: 0 0 15px rgba(0, 102, 204, 0.5);
+}
+
+.play-icon {
+    font-size: 16px;
+}
+
 /* ── Seasons Section ────────────────────────────────────── */
 
 .show-seasons-section {
@@ -113,8 +154,8 @@
 }
 
 .season-card.focused {
-    border-color: #e50914;
-    box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
+    border-color: #0066cc;
+    box-shadow: 0 0 15px rgba(0, 102, 204, 0.4);
     transform: scale(1.05);
 }
 
@@ -190,8 +231,8 @@
 }
 
 .episode-card.focused {
-    border-color: #e50914;
-    box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
+    border-color: #0066cc;
+    box-shadow: 0 0 15px rgba(0, 102, 204, 0.4);
     transform: scale(1.05);
 }
 

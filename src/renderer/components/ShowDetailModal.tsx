@@ -45,17 +45,41 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
     const [loading, setLoading] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(0)
     const [columnCount] = useState(6)
+    const [continueWatchingEpisode, setContinueWatchingEpisode] = useState<Episode | null>(null)
 
-    // Fetch seasons when modal opens
+    // Fetch seasons and find continue watching episode
     useEffect(() => {
         fetchSeasons()
     }, [])
+
+    const findContinueWatchingEpisode = async (seasonsList: Season[]) => {
+        // Try to find an episode with resume position
+        for (const season of seasonsList) {
+            try {
+                const eps = await window.electron.jellyfinApi.getEpisodes(show.id, season.id)
+                // Find first episode with resume position or first unwatched
+                const resumeEp = eps.find((e: Episode) => e.resumePosition && e.resumePosition > 0)
+                if (resumeEp) {
+                    setContinueWatchingEpisode(resumeEp)
+                    return
+                }
+                const unwatchedEp = eps.find((e: Episode) => !e.watched)
+                if (unwatchedEp) {
+                    setContinueWatchingEpisode(unwatchedEp)
+                    return
+                }
+            } catch (err) {
+                console.error('Failed to fetch episodes for season:', season.id, err)
+            }
+        }
+    }
 
     const fetchSeasons = async () => {
         try {
             setLoading(true)
             const response = await window.electron.jellyfinApi.getSeasons(show.id)
             setSeasons(response)
+            await findContinueWatchingEpisode(response)
         } catch (err) {
             console.error('Failed to fetch seasons:', err)
         } finally {
@@ -163,6 +187,27 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
 
                                 {show.overview && (
                                     <p className="show-detail-overview">{show.overview}</p>
+                                )}
+
+                                {/* Continue Watching / Next Episode */}
+                                {continueWatchingEpisode && (
+                                    <div className="continue-watching-section">
+                                        <p className="continue-label">
+                                            {continueWatchingEpisode.resumePosition && continueWatchingEpisode.resumePosition > 0
+                                                ? 'Continue Watching'
+                                                : 'Next Episode'}
+                                        </p>
+                                        <button
+                                            className="continue-button"
+                                            onClick={() => {
+                                                onPlay(continueWatchingEpisode.id, continueWatchingEpisode.title)
+                                            }}
+                                        >
+                                            <span className="play-icon">▶</span>
+                                            {continueWatchingEpisode.episodeNumber && `E${continueWatchingEpisode.episodeNumber}: `}
+                                            {continueWatchingEpisode.title}
+                                        </button>
+                                    </div>
                                 )}
 
                                 <p className="show-detail-nav-hint">
