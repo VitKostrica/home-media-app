@@ -98,51 +98,11 @@ ipcMain.handle('jellyfin:get-episodes', async (_, seriesId: string, seasonId: st
 })
 
 ipcMain.handle('jellyfin:get-resume-items', async () => {
-
-ipcMain.handle('jellyfin:get-playback-info', async (_, itemId: string) => {
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
-    return await jellyfinService.getPlaybackInfo(itemId)
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
-})
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
     return await jellyfinService.getResumeItems()
-
-ipcMain.handle('jellyfin:get-playback-info', async (_, itemId: string) => {
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
-    return await jellyfinService.getPlaybackInfo(itemId)
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
-})
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
 })
 
 ipcMain.handle('jellyfin:get-playback-info', async (_, itemId: string) => {
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
     return await jellyfinService.getPlaybackInfo(itemId)
-
-ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportPlaybackStart(itemId, positionTicks)
-})
 })
 
 ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
