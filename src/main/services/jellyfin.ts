@@ -101,15 +101,33 @@ function ensureAuth(): boolean {
 function mapItem(item: JellyfinItem): MappedItem {
     const config = getConfig()
     const token = accessToken || config.jellyfinApiKey
+    const filePath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
+
+    // Generate local poster path: /path/to/Avatar 2 (2022).mp4 -> /path/to/Avatar 2 (2022)-poster.jpg
+    let posterUrl: string | undefined = undefined
+    if (filePath) {
+        // Extract directory and filename without extension
+        const lastSlash = filePath.lastIndexOf('/')
+        const dir = filePath.substring(0, lastSlash)
+        const filename = filePath.substring(lastSlash + 1)
+        const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'))
+
+        // Construct local poster path
+        const localPosterPath = `${dir}/${nameWithoutExt}-poster.jpg`
+        posterUrl = localPosterPath
+    }
+
+    // Fallback to Jellyfin URL if local poster path wasn't generated
+    if (!posterUrl && item.ImageTags?.Primary) {
+        posterUrl = `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
+    }
 
     return {
         id: item.Id,
         title: item.Name,
         type: item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode',
         year: item.ProductionYear,
-        posterUrl: item.ImageTags?.Primary
-            ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
-            : undefined,
+        posterUrl,
         backdropUrl: item.BackdropImageTags?.length
             ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Backdrop?tag=${item.BackdropImageTags[0]}${token ? `&api_key=${token}` : ''}`
             : undefined,
@@ -120,7 +138,7 @@ function mapItem(item: JellyfinItem): MappedItem {
             ? Math.floor(item.UserData.PlaybackPositionTicks / 10000000)
             : 0,
         playedPercentage: item.UserData?.PlayedPercentage || 0,
-        filePath: item.Path || (item.MediaSources && item.MediaSources[0]?.Path),
+        filePath,
         seriesName: item.SeriesName,
         seasonName: item.SeasonName,
         seasonNumber: item.ParentIndexNumber,
