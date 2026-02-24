@@ -102,35 +102,17 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             let data: MediaItem[] = []
 
             if (activeTab === 0) {
-                // Continue Watching tab - show movies AND series with resume position
-                const [movies, series] = await Promise.all([
-                    api.getMovies(),
-                    api.getSeries(),
-                ])
-
-                const allItems = [...(movies || []), ...(series || [])]
-                console.log('All items count:', allItems.length)
-                console.log('Sample items:', allItems.slice(0, 3).map(i => ({
-                    title: i.title,
-                    resumePosition: i.resumePosition,
-                    playedPercentage: i.playedPercentage,
-                    watched: i.watched,
-                })))
-
-                // Filter for continue watching: items with ANY playback progress or partially watched
-                // This includes movies/shows you've started or are currently watching
-                data = allItems
-                    .filter((item) =>
-                        (item.playedPercentage && item.playedPercentage > 0 && item.playedPercentage < 100) ||
-                        (item.resumePosition && item.resumePosition > 0)
-                    )
-                    .sort(
-                        (a, b) =>
-                            (b.playedPercentage || 0) - (a.playedPercentage || 0)
-                    )
-                    .slice(0, 24)
-
-                console.log('Continue watching filtered count:', data.length)
+                // Continue Watching tab - use dedicated endpoint
+                const resumeItems = await api.getResumeItems()
+                console.log('Resume items count:', resumeItems?.length || 0)
+                if (resumeItems && resumeItems.length > 0) {
+                    console.log('Sample resume items:', resumeItems.slice(0, 3).map(i => ({
+                        title: i.title,
+                        type: i.type,
+                        playedPercentage: i.playedPercentage,
+                    })))
+                }
+                data = (resumeItems || []).slice(0, 24)
             } else if (activeTab === 1) {
                 // Movies tab
                 data = await api.getMovies()

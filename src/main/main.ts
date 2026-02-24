@@ -97,6 +97,10 @@ ipcMain.handle('jellyfin:get-episodes', async (_, seriesId: string, seasonId: st
     return await jellyfinService.getEpisodes(seriesId, seasonId)
 })
 
+ipcMain.handle('jellyfin:get-resume-items', async () => {
+    return await jellyfinService.getResumeItems()
+})
+
 ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTicks: number) => {
     await jellyfinService.reportProgress(itemId, positionTicks)
 })

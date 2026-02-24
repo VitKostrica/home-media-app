@@ -237,6 +237,29 @@ export async function getEpisodes(
     }
 }
 
+/** Get items with resume position (Continue Watching) */
+export async function getResumeItems(): Promise<MappedItem[]> {
+    if (!ensureAuth()) return []
+
+    try {
+        const api = getClient()
+        const response = await api.get(`/Users/${userId}/Items/Resume`, {
+            params: {
+                Limit: 50,
+                Recursive: true,
+                Fields: 'Overview,Path,MediaSources,UserData',
+                SortBy: 'DatePlayed',
+                SortOrder: 'Descending',
+            },
+            headers: getHeaders(),
+        })
+        return (response.data.Items || []).map(mapItem)
+    } catch (err) {
+        console.error('Failed to fetch resume items:', err)
+        return []
+    }
+}
+
 /** Tell Jellyfin playback has started */
 export async function reportPlaybackStart(itemId: string, positionTicks: number = 0): Promise<void> {
     if (!ensureAuth()) return
