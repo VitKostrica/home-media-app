@@ -1,0 +1,268 @@
+.show-detail-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    outline: none;
+}
+
+.show-detail-card {
+    background-color: #1a1a1a;
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Show Detail View ────────────────────────────────────── */
+
+.show-detail-view {
+    display: flex;
+    gap: 30px;
+}
+
+.show-detail-poster {
+    flex-shrink: 0;
+    width: 200px;
+    height: 300px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #333 0%, #222 100%);
+}
+
+.show-detail-poster-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+    font-weight: bold;
+    color: #666;
+    background: linear-gradient(135deg, #333 0%, #222 100%);
+}
+
+.show-detail-info {
+    flex: 1;
+}
+
+.show-detail-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #fff;
+    margin: 0 0 10px 0;
+}
+
+.show-detail-year {
+    font-size: 24px;
+    color: #999;
+    font-weight: normal;
+}
+
+.show-detail-overview {
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 15px 0;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.show-detail-actions {
+    margin-top: 20px;
+}
+
+.show-detail-button {
+    background-color: #e50914;
+    color: #fff;
+    border: 2px solid #e50914;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.show-detail-button:hover,
+.show-detail-button.focused {
+    background-color: #c40812;
+    border-color: #c40812;
+    box-shadow: 0 0 20px rgba(229, 9, 20, 0.5);
+}
+
+.show-detail-nav-hint {
+    color: #999;
+    font-size: 12px;
+    margin-top: 20px;
+}
+
+/* ── Seasons View ────────────────────────────────────── */
+
+.show-seasons-view,
+.show-episodes-view {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.view-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+    margin: 0 0 20px 0;
+}
+
+.seasons-list,
+.episodes-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    padding-bottom: 20px;
+}
+
+.season-item,
+.episode-item {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #3a3a3a;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.season-item.focused,
+.episode-item.focused {
+    border-color: #e50914;
+    box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
+    transform: scale(1.05);
+}
+
+.season-poster-small,
+.episode-poster-small {
+    width: 100%;
+    aspect-ratio: 2/3;
+    background: linear-gradient(135deg, #333 0%, #222 100%);
+    overflow: hidden;
+}
+
+.season-poster-small img,
+.episode-poster-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.season-poster-placeholder,
+.episode-poster-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: bold;
+    color: #666;
+    background: linear-gradient(135deg, #333 0%, #222 100%);
+}
+
+.season-info-small,
+.episode-info-small {
+    padding: 12px;
+}
+
+.season-title,
+.episode-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.episode-progress-bar {
+    height: 3px;
+    background-color: #3a3a3a;
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+}
+
+.episode-progress-fill {
+    height: 100%;
+    background-color: #e50914;
+}
+
+.episode-watched-badge {
+    font-size: 11px;
+    color: #4ade80;
+    margin-top: 4px;
+    margin-bottom: 0;
+}
+
+/* Scrollbar styling */
+.show-detail-card::-webkit-scrollbar {
+    width: 8px;
+}
+
+.show-detail-card::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.show-detail-card::-webkit-scrollbar-thumb {
+    background: #e50914;
+    border-radius: 4px;
+}
+
+.show-detail-card::-webkit-scrollbar-thumb:hover {
+    background: #c40812;
+}
+
+.show-seasons-view::-webkit-scrollbar,
+.show-episodes-view::-webkit-scrollbar {
+    width: 8px;
+}
+
+.show-seasons-view::-webkit-scrollbar-track,
+.show-episodes-view::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+.show-seasons-view::-webkit-scrollbar-thumb,
+.show-episodes-view::-webkit-scrollbar-thumb {
+    background: #e50914;
+    border-radius: 4px;
+}
+
+.show-seasons-view::-webkit-scrollbar-thumb:hover,
+.show-episodes-view::-webkit-scrollbar-thumb:hover {
+    background: #c40812;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .show-detail-view {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .show-detail-poster {
+        width: 100%;
+        height: 400px;
+    }
+
+    .seasons-list,
+    .episodes-list {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}

@@ -3,6 +3,7 @@ import '../styles/MediaAppScreen.css'
 import MediaCard from '../components/MediaCard'
 import JellyfinLogin from '../components/JellyfinLogin'
 import VideoPlayer from '../components/VideoPlayer'
+import ShowDetailModal from '../components/ShowDetailModal'
 
 interface MediaItem {
     id: string
@@ -43,6 +44,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [gridIndex, setGridIndex] = useState<number>(0)
     const [showDetail, setShowDetail] = useState<boolean>(false)
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
+    const [showShowDetail, setShowShowDetail] = useState<boolean>(false)
     const [playerBtnIndex, setPlayerBtnIndex] = useState<number>(0) // 0 = HTML5, 1 = VLC
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
     const [playingItem, setPlayingItem] = useState<MediaItem | null>(null)
@@ -517,8 +519,12 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                 isFocused={index === gridIndex}
                                 onSelect={() => {
                                     setSelectedItem(item)
-                                    setShowDetail(true)
-                                    setPlayerBtnIndex(0)
+                                    if (item.type === 'series') {
+                                        setShowShowDetail(true)
+                                    } else {
+                                        setShowDetail(true)
+                                        setPlayerBtnIndex(0)
+                                    }
                                 }}
                             />
                         ))}
@@ -535,8 +541,12 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                 isFocused={index === gridIndex}
                                 onSelect={() => {
                                     setSelectedItem(item)
-                                    setShowDetail(true)
-                                    setPlayerBtnIndex(0)
+                                    if (item.type === 'series') {
+                                        setShowShowDetail(true)
+                                    } else {
+                                        setShowDetail(true)
+                                        setPlayerBtnIndex(0)
+                                    }
                                 }}
                             />
                         ))}
@@ -662,6 +672,34 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Show Detail Modal */}
+            {showShowDetail && selectedItem && (
+                <ShowDetailModal
+                    show={{
+                        id: selectedItem.id,
+                        title: selectedItem.title,
+                        posterUrl: selectedItem.posterUrl,
+                        overview: selectedItem.overview,
+                        year: selectedItem.year,
+                    }}
+                    onClose={() => {
+                        setShowShowDetail(false)
+                        setSelectedItem(null)
+                    }}
+                    onPlay={(itemId: string, itemTitle: string) => {
+                        const episode: MediaItem = {
+                            id: itemId,
+                            title: itemTitle,
+                            type: 'episode',
+                            watched: false,
+                        }
+                        setShowShowDetail(false)
+                        setSelectedItem(null)
+                        setShowPlayerSelect(episode)
+                    }}
+                />
             )}
 
             {/* Footer */}
