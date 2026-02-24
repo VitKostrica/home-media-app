@@ -64,17 +64,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const initializeVideo = async () => {
             let videoSource = filePath
 
+            console.log('VideoPlayer: Initializing video', {
+                jellyfinItemId,
+                filePath,
+                startPosition,
+                hasElectronApi: !!window.electron,
+            })
+
             // Try to use Jellyfin API to get proper stream URL
-            if (jellyfinItemId) {
+            if (jellyfinItemId && window.electron) {
                 try {
-                    const playbackInfo = await window.electron?.jellyfinApi?.getPlaybackInfo?.(jellyfinItemId)
+                    console.log('VideoPlayer: Requesting playback info for item:', jellyfinItemId)
+                    const playbackInfo = await window.electron.jellyfinApi.getPlaybackInfo(jellyfinItemId)
+                    console.log('VideoPlayer: Playback info received:', playbackInfo)
+
                     if (playbackInfo?.streamUrl) {
                         videoSource = playbackInfo.streamUrl
                         console.log('VideoPlayer: Got Jellyfin stream URL:', videoSource)
-                        
+
                         // Report playback start to Jellyfin
                         const startPositionTicks = startPosition * 10000000
-                        await window.electron?.jellyfinApi?.reportPlaybackStart?.(jellyfinItemId, startPositionTicks)
+                        console.log('VideoPlayer: Reporting playback start:', {
+                            itemId: jellyfinItemId,
+                            positionTicks: startPositionTicks,
+                        })
+                        await window.electron.jellyfinApi.reportPlaybackStart(jellyfinItemId, startPositionTicks)
                     } else {
                         throw new Error('No stream URL from playback info')
                     }
@@ -83,6 +97,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     // Fall back to file path
                     videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
                 }
+            } else if (!window.electron) {
+                console.warn('VideoPlayer: Electron API not available, using file path')
+                videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
             } else {
                 // No item ID, use file path
                 videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`

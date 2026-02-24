@@ -280,18 +280,24 @@ export async function getResumeItems(): Promise<MappedItem[]> {
 export async function getPlaybackInfo(
     itemId: string
 ): Promise<{ streamUrl?: string; mediaSourceId?: string }> {
-    if (!ensureAuth()) return {}
+    if (!ensureAuth()) {
+        console.error('getPlaybackInfo: Not authenticated')
+        return {}
+    }
 
     try {
         const config = getConfig()
         const token = accessToken || config.jellyfinApiKey
         const client = getClient()
 
-        // First, get PlaybackInfo from the API to find available stream URLs
-        // This tells us what streaming options are available from Jellyfin
+        console.log('getPlaybackInfo: Requesting playback info for itemId:', itemId)
+
+        // First, try the PlaybackInfo endpoint to get streaming options
+        // This tells us what streaming methods are available
         const playbackInfoUrl = `/Items/${itemId}/PlaybackInfo?api_key=${token}&UserId=${userId}`
 
         try {
+            console.log('getPlaybackInfo: Calling PlaybackInfo endpoint:', playbackInfoUrl)
             const response = await client.post<any>(playbackInfoUrl, {
                 DeviceProfile: {
                     CodecProfiles: [],
@@ -301,29 +307,35 @@ export async function getPlaybackInfo(
                 headers: getHeaders(),
             })
 
-            console.log('PlaybackInfo response:', response.data)
+            console.log('getPlaybackInfo: Response received:', {
+                hasMediaSources: !!response.data?.MediaSources,
+                mediaSourceCount: response.data?.MediaSources?.length || 0,
+                firstMediaSource: response.data?.MediaSources?.[0],
+            })
 
-            // Check if we have a direct stream URL (this is what prevents full download)
-            // HLS requires the hls.m3u8 endpoint
+            // Check if we have media sources
             if (response.data?.MediaSources?.[0]) {
                 const mediaSource = response.data.MediaSources[0]
+                console.log('getPlaybackInfo: Using media source:', {
+                    id: mediaSource.Id,
+                    supportsDirectStream: mediaSource.SupportsDirectStream,
+                    path: mediaSource.Path,
+                })
 
-                // Prefer HLS streaming for efficient buffering
-                // HLS segments the video into chunks, only downloading what's needed
+                // Prefer direct stream (no transcoding)
                 if (mediaSource.SupportsDirectStream) {
-                    // Use direct stream without transcoding but with streaming parameters
                     const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}&static=true&mediaSourceId=${mediaSource.Id || 'default'}`
-                    console.log('Using direct stream URL:', streamUrl)
+                    console.log('getPlaybackInfo: Returning direct stream URL:', streamUrl)
                     return {
                         streamUrl,
                         mediaSourceId: mediaSource.Id || 'default',
                     }
                 }
 
-                // Fall back to direct file if available
+                // Fall back to file path if available
                 if (mediaSource.Path) {
                     const streamUrl = `file://${mediaSource.Path}`
-                    console.log('Using file path:', streamUrl)
+                    console.log('getPlaybackInfo: Returning file path:', streamUrl)
                     return {
                         streamUrl,
                         mediaSourceId: mediaSource.Id || 'default',
@@ -331,30 +343,32 @@ export async function getPlaybackInfo(
                 }
             }
 
-            // If PlaybackInfo didn't give us what we need, try direct stream with streaming params
+            // No suitable media source found, use basic stream endpoint
             const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}&static=true`
-            console.log('Using fallback stream URL:', streamUrl)
+            console.log('getPlaybackInfo: No suitable media source, using basic stream URL:', streamUrl)
             return {
                 streamUrl,
                 mediaSourceId: 'default',
             }
-        } catch (err) {
-            console.error('PlaybackInfo request failed, using fallback streaming URL:', err)
+        } catch (err: any) {
+            console.error('getPlaybackInfo: PlaybackInfo endpoint failed:', {
+                error: err?.message,
+                status: err?.response?.status,
+                data: err?.response?.data,
+            })
 
-            // Fallback: direct stream endpoint with explicit streaming parameters
-            // The key parameters:
-            // - static=true: direct stream, no transcoding
-            // - This endpoint respects HTTP Range headers for progressive download
+            // Fallback: use direct stream endpoint
+            // This will work if the server supports direct streaming
             const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}&static=true`
-            console.log('Using direct stream fallback:', streamUrl)
+            console.log('getPlaybackInfo: Using direct stream fallback:', streamUrl)
 
             return {
                 streamUrl,
                 mediaSourceId: 'default',
             }
         }
-    } catch (err) {
-        console.error('Failed to get stream URL:', err)
+    } catch (err: any) {
+        console.error('getPlaybackInfo: Unexpected error:', err?.message || err)
         return {}
     }
 }

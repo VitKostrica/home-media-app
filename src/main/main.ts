@@ -102,7 +102,10 @@ ipcMain.handle('jellyfin:get-resume-items', async () => {
 })
 
 ipcMain.handle('jellyfin:get-playback-info', async (_, itemId: string) => {
-    return await jellyfinService.getPlaybackInfo(itemId)
+    console.log('[IPC] jellyfin:get-playback-info called with itemId:', itemId)
+    const result = await jellyfinService.getPlaybackInfo(itemId)
+    console.log('[IPC] jellyfin:get-playback-info result:', result)
+    return result
 })
 
 ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, positionTicks: number) => {
