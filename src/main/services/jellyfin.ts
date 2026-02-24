@@ -99,7 +99,7 @@ function ensureAuth(): boolean {
 }
 
 /** Map a Jellyfin API item to our clean format */
-function mapItem(item: JellyfinItem): MappedItem {
+function mapItem(item: JellyfinItem, useJellyfinOnly: boolean = false): MappedItem {
     const config = getConfig()
     const token = accessToken || config.jellyfinApiKey
     const filePath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
@@ -113,7 +113,11 @@ function mapItem(item: JellyfinItem): MappedItem {
         posterUrlFallback = `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
     }
 
-    if (filePath) {
+    // If useJellyfinOnly flag is set, use Jellyfin URL directly (for Continue Watching, etc)
+    if (useJellyfinOnly) {
+        posterUrl = posterUrlFallback
+        posterUrlFallback = undefined
+    } else if (filePath) {
         let localPosterPath: string | undefined
 
         if (item.Type === 'Series') {
@@ -306,7 +310,7 @@ export async function getResumeItems(): Promise<MappedItem[]> {
             },
             headers: getHeaders(),
         })
-        return (response.data.Items || []).map(mapItem)
+        return (response.data.Items || []).map((item: JellyfinItem) => mapItem(item, true))
     } catch (err) {
         console.error('Failed to fetch resume items:', err)
         return []
