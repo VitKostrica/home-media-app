@@ -322,24 +322,14 @@ export async function getPlaybackInfo(
                     path: mediaSource.Path,
                 })
 
-                // Prefer direct stream (no transcoding)
-                if (mediaSource.SupportsDirectStream) {
-                    const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}&static=true&mediaSourceId=${mediaSource.Id || 'default'}`
-                    console.log('getPlaybackInfo: Returning direct stream URL:', streamUrl)
-                    return {
-                        streamUrl,
-                        mediaSourceId: mediaSource.Id || 'default',
-                    }
-                }
-
-                // Fall back to file path if available
-                if (mediaSource.Path) {
-                    const streamUrl = `file://${mediaSource.Path}`
-                    console.log('getPlaybackInfo: Returning file path:', streamUrl)
-                    return {
-                        streamUrl,
-                        mediaSourceId: mediaSource.Id || 'default',
-                    }
+                // Always use HTTP streaming URL from Jellyfin, never file://
+                // Electron blocks file:// URLs from the renderer process for security
+                // Jellyfin can serve the file via HTTP streaming
+                const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}&static=true&mediaSourceId=${mediaSource.Id || 'default'}`
+                console.log('getPlaybackInfo: Returning HTTP stream URL:', streamUrl)
+                return {
+                    streamUrl,
+                    mediaSourceId: mediaSource.Id || 'default',
                 }
             }
 
