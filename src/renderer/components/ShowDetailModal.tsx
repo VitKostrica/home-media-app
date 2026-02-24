@@ -35,7 +35,7 @@ interface ShowDetailModalProps {
     onPlay: (itemId: string, itemTitle: string) => void
 }
 
-type ViewMode = 'show' | 'seasons' | 'episodes'
+type ViewMode = 'show' | 'episodes'
 
 const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('show')
@@ -44,6 +44,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
     const [selectedSeason, setSelectedSeason] = useState<Season | null>(null)
     const [loading, setLoading] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(0)
+    const [columnCount] = useState(6)
 
     // Fetch seasons when modal opens
     useEffect(() => {
@@ -86,9 +87,6 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
             if (viewMode === 'show') {
                 onClose()
             } else if (viewMode === 'episodes') {
-                setViewMode('seasons')
-                setSelectedIndex(0)
-            } else if (viewMode === 'seasons') {
                 setViewMode('show')
                 setSelectedIndex(0)
             }
@@ -96,16 +94,17 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
         }
 
         if (viewMode === 'show') {
-            if (e.key === 'Enter' || e.key === ' ') {
-                setViewMode('seasons')
-                setSelectedIndex(0)
-                e.preventDefault()
-            }
-        } else if (viewMode === 'seasons') {
+            const rowSize = columnCount
             if (e.key === 'ArrowDown') {
-                setSelectedIndex(Math.min(selectedIndex + 1, seasons.length - 1))
+                setSelectedIndex(Math.min(selectedIndex + rowSize, seasons.length - 1))
                 e.preventDefault()
             } else if (e.key === 'ArrowUp') {
+                setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
+                e.preventDefault()
+            } else if (e.key === 'ArrowRight') {
+                setSelectedIndex(Math.min(selectedIndex + 1, seasons.length - 1))
+                e.preventDefault()
+            } else if (e.key === 'ArrowLeft') {
                 setSelectedIndex(Math.max(selectedIndex - 1, 0))
                 e.preventDefault()
             } else if (e.key === 'Enter' || e.key === ' ') {
@@ -113,10 +112,17 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                 e.preventDefault()
             }
         } else if (viewMode === 'episodes') {
+            const rowSize = columnCount
             if (e.key === 'ArrowDown') {
-                setSelectedIndex(Math.min(selectedIndex + 1, episodes.length - 1))
+                setSelectedIndex(Math.min(selectedIndex + rowSize, episodes.length - 1))
                 e.preventDefault()
             } else if (e.key === 'ArrowUp') {
+                setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
+                e.preventDefault()
+            } else if (e.key === 'ArrowRight') {
+                setSelectedIndex(Math.min(selectedIndex + 1, episodes.length - 1))
+                e.preventDefault()
+            } else if (e.key === 'ArrowLeft') {
                 setSelectedIndex(Math.max(selectedIndex - 1, 0))
                 e.preventDefault()
             } else if (e.key === 'Enter' || e.key === ' ') {
@@ -138,74 +144,63 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
             <div className="show-detail-card" onClick={(e) => e.stopPropagation()}>
                 {viewMode === 'show' && (
                     <div className="show-detail-view">
-                        <div className="show-detail-poster">
-                            {show.posterUrl ? (
-                                <LazyImage src={show.posterUrl} alt={show.title} />
-                            ) : (
-                                <div className="show-detail-poster-placeholder">
-                                    {show.title.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="show-detail-info">
-                            <h2 className="show-detail-title">
-                                {show.title}
-                                {show.year && <span className="show-detail-year"> ({show.year})</span>}
-                            </h2>
-
-                            {show.overview && (
-                                <p className="show-detail-overview">{show.overview}</p>
-                            )}
-
-                            <div className="show-detail-actions">
-                                <button className="show-detail-button focused">
-                                    View Seasons →
-                                </button>
+                        <div className="show-header">
+                            <div className="show-detail-poster">
+                                {show.posterUrl ? (
+                                    <LazyImage src={show.posterUrl} alt={show.title} />
+                                ) : (
+                                    <div className="show-detail-poster-placeholder">
+                                        {show.title.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                             </div>
 
-                            <p className="show-detail-nav-hint">
-                                Enter view seasons • Back close
-                            </p>
+                            <div className="show-detail-info">
+                                <h2 className="show-detail-title">
+                                    {show.title}
+                                    {show.year && <span className="show-detail-year"> ({show.year})</span>}
+                                </h2>
+
+                                {show.overview && (
+                                    <p className="show-detail-overview">{show.overview}</p>
+                                )}
+
+                                <p className="show-detail-nav-hint">
+                                    ↑ ↓ ← → select season • Enter play • Back close
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                )}
 
-                {viewMode === 'seasons' && (
-                    <div className="show-seasons-view">
-                        <h3 className="view-title">Seasons</h3>
-
-                        <div className="seasons-list">
+                        <div className="show-seasons-section">
+                            <h3 className="seasons-title">Seasons</h3>
                             {loading ? (
                                 <p>Loading seasons...</p>
                             ) : seasons.length === 0 ? (
                                 <p>No seasons found</p>
                             ) : (
-                                seasons.map((season, idx) => (
-                                    <div
-                                        key={season.id}
-                                        className={`season-item ${idx === selectedIndex ? 'focused' : ''}`}
-                                    >
-                                        <div className="season-poster-small">
-                                            {season.posterUrl ? (
-                                                <LazyImage src={season.posterUrl} alt={season.title} />
-                                            ) : (
-                                                <div className="season-poster-placeholder">
-                                                    {season.seasonNumber !== undefined ? `S${season.seasonNumber}` : 'S?'}
-                                                </div>
-                                            )}
+                                <div className="seasons-grid" style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
+                                    {seasons.map((season, idx) => (
+                                        <div
+                                            key={season.id}
+                                            className={`season-card ${idx === selectedIndex ? 'focused' : ''}`}
+                                        >
+                                            <div className="season-poster">
+                                                {season.posterUrl ? (
+                                                    <LazyImage src={season.posterUrl} alt={season.title} />
+                                                ) : (
+                                                    <div className="season-poster-placeholder">
+                                                        {season.seasonNumber !== undefined ? `S${season.seasonNumber}` : 'S?'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="season-info">
+                                                <p className="season-title">{season.title}</p>
+                                            </div>
                                         </div>
-                                        <div className="season-info-small">
-                                            <p className="season-title">{season.title}</p>
-                                        </div>
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
                         </div>
-
-                        <p className="show-detail-nav-hint">
-                            ↑ ↓ select • Enter view episodes • Back show
-                        </p>
                     </div>
                 )}
 
@@ -215,7 +210,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                             {show.title} - {selectedSeason?.title}
                         </h3>
 
-                        <div className="episodes-list">
+                        <div className="episodes-grid" style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
                             {loading ? (
                                 <p>Loading episodes...</p>
                             ) : episodes.length === 0 ? (
@@ -224,9 +219,9 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                 episodes.map((episode, idx) => (
                                     <div
                                         key={episode.id}
-                                        className={`episode-item ${idx === selectedIndex ? 'focused' : ''}`}
+                                        className={`episode-card ${idx === selectedIndex ? 'focused' : ''}`}
                                     >
-                                        <div className="episode-poster-small">
+                                        <div className="episode-poster">
                                             {episode.posterUrl ? (
                                                 <LazyImage src={episode.posterUrl} alt={episode.title} />
                                             ) : (
@@ -235,7 +230,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="episode-info-small">
+                                        <div className="episode-info">
                                             <p className="episode-title">
                                                 {episode.episodeNumber && `E${episode.episodeNumber}: `}
                                                 {episode.title}
@@ -258,7 +253,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                         </div>
 
                         <p className="show-detail-nav-hint">
-                            ↑ ↓ select • Enter play • Back seasons
+                            ↑ ↓ ← → select episode • Enter play • Back seasons
                         </p>
                     </div>
                 )}

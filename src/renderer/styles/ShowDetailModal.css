@@ -16,9 +16,9 @@
     background-color: #1a1a1a;
     border-radius: 12px;
     padding: 30px;
-    max-width: 900px;
-    width: 90%;
-    max-height: 80vh;
+    max-width: 1400px;
+    width: 95%;
+    max-height: 85vh;
     overflow-y: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
@@ -26,6 +26,12 @@
 /* ── Show Detail View ────────────────────────────────────── */
 
 .show-detail-view {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.show-header {
     display: flex;
     gap: 30px;
 }
@@ -73,64 +79,31 @@
     font-size: 14px;
     line-height: 1.6;
     margin: 15px 0;
-    max-height: 150px;
+    max-height: 100px;
     overflow-y: auto;
 }
 
-.show-detail-actions {
-    margin-top: 20px;
-}
+/* ── Seasons Section ────────────────────────────────────── */
 
-.show-detail-button {
-    background-color: #e50914;
-    color: #fff;
-    border: 2px solid #e50914;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.show-detail-button:hover,
-.show-detail-button.focused {
-    background-color: #c40812;
-    border-color: #c40812;
-    box-shadow: 0 0 20px rgba(229, 9, 20, 0.5);
-}
-
-.show-detail-nav-hint {
-    color: #999;
-    font-size: 12px;
-    margin-top: 20px;
-}
-
-/* ── Seasons View ────────────────────────────────────── */
-
-.show-seasons-view,
-.show-episodes-view {
-    max-height: 70vh;
-    overflow-y: auto;
-}
-
-.view-title {
-    font-size: 22px;
-    font-weight: bold;
-    color: #fff;
-    margin: 0 0 20px 0;
-}
-
-.seasons-list,
-.episodes-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+.show-seasons-section {
+    display: flex;
+    flex-direction: column;
     gap: 15px;
-    padding-bottom: 20px;
 }
 
-.season-item,
-.episode-item {
+.seasons-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #fff;
+    margin: 0;
+}
+
+.seasons-grid {
+    display: grid;
+    gap: 15px;
+}
+
+.season-card {
     background-color: #2a2a2a;
     border-radius: 8px;
     overflow: hidden;
@@ -139,29 +112,102 @@
     cursor: pointer;
 }
 
-.season-item.focused,
-.episode-item.focused {
+.season-card.focused {
     border-color: #e50914;
     box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
     transform: scale(1.05);
 }
 
-.season-poster-small,
-.episode-poster-small {
+.season-poster {
     width: 100%;
     aspect-ratio: 2/3;
     background: linear-gradient(135deg, #333 0%, #222 100%);
     overflow: hidden;
 }
 
-.season-poster-small img,
-.episode-poster-small img {
+.season-poster img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.season-poster-placeholder,
+.season-poster-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: bold;
+    color: #666;
+    background: linear-gradient(135deg, #333 0%, #222 100%);
+}
+
+.season-info {
+    padding: 12px;
+}
+
+.season-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Episodes View ────────────────────────────────────── */
+
+.show-episodes-view {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 75vh;
+}
+
+.view-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+    margin: 0;
+}
+
+.episodes-grid {
+    display: grid;
+    gap: 15px;
+    overflow-y: auto;
+    padding-bottom: 10px;
+}
+
+.episode-card {
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #3a3a3a;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.episode-card.focused {
+    border-color: #e50914;
+    box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
+    transform: scale(1.05);
+}
+
+.episode-poster {
+    width: 100%;
+    aspect-ratio: 2/3;
+    background: linear-gradient(135deg, #333 0%, #222 100%);
+    overflow: hidden;
+}
+
+.episode-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .episode-poster-placeholder {
     width: 100%;
     height: 100%;
@@ -174,12 +220,10 @@
     background: linear-gradient(135deg, #333 0%, #222 100%);
 }
 
-.season-info-small,
-.episode-info-small {
+.episode-info {
     padding: 12px;
 }
 
-.season-title,
 .episode-title {
     font-size: 13px;
     font-weight: 600;
@@ -188,6 +232,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .episode-progress-bar {
@@ -210,6 +257,12 @@
     margin-bottom: 0;
 }
 
+.show-detail-nav-hint {
+    color: #999;
+    font-size: 12px;
+    margin-top: 15px;
+}
+
 /* Scrollbar styling */
 .show-detail-card::-webkit-scrollbar {
     width: 8px;
@@ -228,41 +281,19 @@
     background: #c40812;
 }
 
-.show-seasons-view::-webkit-scrollbar,
-.show-episodes-view::-webkit-scrollbar {
+.episodes-grid::-webkit-scrollbar {
     width: 8px;
 }
 
-.show-seasons-view::-webkit-scrollbar-track,
-.show-episodes-view::-webkit-scrollbar-track {
+.episodes-grid::-webkit-scrollbar-track {
     background: #2a2a2a;
 }
 
-.show-seasons-view::-webkit-scrollbar-thumb,
-.show-episodes-view::-webkit-scrollbar-thumb {
+.episodes-grid::-webkit-scrollbar-thumb {
     background: #e50914;
     border-radius: 4px;
 }
 
-.show-seasons-view::-webkit-scrollbar-thumb:hover,
-.show-episodes-view::-webkit-scrollbar-thumb:hover {
+.episodes-grid::-webkit-scrollbar-thumb:hover {
     background: #c40812;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .show-detail-view {
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .show-detail-poster {
-        width: 100%;
-        height: 400px;
-    }
-
-    .seasons-list,
-    .episodes-list {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    }
 }
