@@ -176,16 +176,14 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 // Use embedded HTML5 player
                 console.log('Starting HTML5 player with:', {
                     filePath: item.filePath,
-                    startPosition: item.resumePosition ? Math.floor(item.resumePosition / 10000000) : 0,
+                    startPosition: item.resumePosition || 0,
                 })
                 setPlayingItem(item)
                 setShowPlayerSelect(null)
                 setShowDetail(false)
             } else if (playerType === 'vlc') {
                 // Launch VLC as fullscreen overlay
-                const startPosition = item.resumePosition
-                    ? Math.floor(item.resumePosition / 10000000)
-                    : 0
+                const startPosition = item.resumePosition || 0
 
                 console.log('Launching VLC with:', {
                     filePath: item.filePath,
