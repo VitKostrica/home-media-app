@@ -688,13 +688,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         setShowShowDetail(false)
                         setSelectedItem(null)
                     }}
-                    onPlay={(itemId: string, itemTitle: string) => {
-                        const episode: MediaItem = {
-                            id: itemId,
-                            title: itemTitle,
-                            type: 'episode',
-                            watched: false,
-                        }
+                    onPlay={(episode) => {
                         setShowShowDetail(false)
                         setSelectedItem(null)
                         setShowPlayerSelect(episode)

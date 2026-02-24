@@ -32,7 +32,7 @@ interface ShowDetailModalProps {
         year?: number
     }
     onClose: () => void
-    onPlay: (itemId: string, itemTitle: string) => void
+    onPlay: (episode: Episode) => void
 }
 
 type ViewMode = 'show' | 'episodes'
@@ -151,7 +151,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                 e.preventDefault()
             } else if (e.key === 'Enter' || e.key === ' ') {
                 const episode = episodes[selectedIndex]
-                onPlay(episode.id, episode.title)
+                onPlay(episode)
                 e.preventDefault()
             }
         }
@@ -200,7 +200,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                         <button
                                             className="continue-button"
                                             onClick={() => {
-                                                onPlay(continueWatchingEpisode.id, continueWatchingEpisode.title)
+                                                onPlay(continueWatchingEpisode)
                                             }}
                                         >
                                             <span className="play-icon">▶</span>
@@ -266,7 +266,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                     <div
                                         key={episode.id}
                                         className={`episode-card ${idx === selectedIndex ? 'focused' : ''}`}
-                                        onClick={() => onPlay(episode.id, episode.title)}
+                                        onClick={() => onPlay(episode)}
                                     >
                                         <div className="episode-poster">
                                             {episode.posterUrl ? (
