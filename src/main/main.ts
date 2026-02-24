@@ -123,7 +123,7 @@ ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTick
 // ── Player IPC ───────────────────────────────────────────────
 
 ipcMain.handle('player:launch', (_, type: string, filePath: string, startPosition?: number, jellyfinItemId?: string) => {
-    return playerService.launchPlayer(type as 'mpv' | 'vlc', filePath, startPosition, jellyfinItemId)
+    return playerService.launchPlayer(type as 'mpv' | 'vlc', filePath, startPosition, jellyfinItemId, mainWindow || undefined)
 })
 
 ipcMain.handle('player:stop', () => {

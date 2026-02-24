@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process'
+import { BrowserWindow } from 'electron'
 import * as jellyfinService from './jellyfin'
 
 type PlayerType = 'mpv' | 'vlc'
@@ -14,7 +15,8 @@ export function launchPlayer(
     type: PlayerType,
     filePath: string,
     startPosition?: number,
-    jellyfinItemId?: string
+    jellyfinItemId?: string,
+    mainWindow?: BrowserWindow
 ): { success: boolean; error?: string } {
     // Kill existing player if running
     if (currentPlayer && !currentPlayer.killed) {
@@ -35,8 +37,8 @@ export function launchPlayer(
             args.push(filePath)
             currentPlayer = spawn('mpv', args, { detached: true, stdio: 'ignore' })
         } else {
-            // VLC
-            args = ['--fullscreen']
+            // VLC - add maximized window options
+            args = ['--fullscreen', '--quiet']
             if (startPosition && startPosition > 0) {
                 args.push(`--start-time=${startPosition}`)
             }
@@ -44,15 +46,39 @@ export function launchPlayer(
             currentPlayer = spawn('vlc', args, { detached: true, stdio: 'ignore' })
         }
 
+        // Minimize or hide Electron window to bring VLC to front
+        // This ensures the fullscreen player is visible
+        if (mainWindow && process.platform === 'linux') {
+            setImmediate(() => {
+                try {
+                    // Use xdotool to raise VLC window on Linux
+                    const xdotool = spawn('bash', ['-c', 'sleep 0.2 && xdotool search --name "vlc" windowactivate || true'], {
+                        detached: true,
+                        stdio: 'ignore',
+                    })
+                    xdotool.unref()
+                } catch (err) {
+                    console.warn('Failed to focus VLC with xdotool:', err)
+                    // Fallback: minimize Electron window
+                    mainWindow.minimize()
+                }
+            })
+        }
+
         // Report playback start to Jellyfin
         if (currentItemId) {
             const positionTicks = (startPosition || 0) * 10000000
-            jellyfinService.reportPlaybackStart(currentItemId, positionTicks).catch(() => {})
+            jellyfinService.reportPlaybackStart(currentItemId, positionTicks).catch(() => { })
         }
 
         currentPlayer.on('error', (err) => {
             console.error(`Failed to launch ${type}:`, err.message)
             currentPlayer = null
+            // Restore Electron window if player failed
+            if (mainWindow && mainWindow.isMinimized()) {
+                mainWindow.restore()
+                mainWindow.focus()
+            }
         })
 
         currentPlayer.on('exit', (code) => {
@@ -63,7 +89,13 @@ export function launchPlayer(
             // For now, report the start position. Real tracking via MPV IPC comes later.
             if (currentItemId) {
                 const positionTicks = (startPosition || 0) * 10000000
-                jellyfinService.reportStopped(currentItemId, positionTicks).catch(() => {})
+                jellyfinService.reportStopped(currentItemId, positionTicks).catch(() => { })
+            }
+
+            // Restore Electron window when player closes
+            if (mainWindow && mainWindow.isMinimized()) {
+                mainWindow.restore()
+                mainWindow.focus()
             }
 
             currentPlayer = null
