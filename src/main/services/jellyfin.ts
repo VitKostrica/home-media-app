@@ -286,11 +286,16 @@ export async function getPlaybackInfo(
         const config = getConfig()
         const token = accessToken || config.jellyfinApiKey
 
-        // Use direct stream endpoint - Jellyfin's simple streaming
-        // Format: /Videos/{ItemId}/stream
-        const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}`
+        // Use streaming endpoint with progressive parameters
+        // static=false enables streaming/transcoding instead of full file download
+        // This ensures Jellyfin only sends data as it's needed for playback
+        const params = new URLSearchParams({
+            api_key: token,
+            static: 'false', // Force streaming instead of direct file download
+        })
+        const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?${params.toString()}`
         
-        console.log('Using direct stream URL:', streamUrl)
+        console.log('Using streaming URL:', streamUrl)
 
         return {
             streamUrl,
