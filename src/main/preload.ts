@@ -39,4 +39,13 @@ contextBridge.exposeInMainWorld('electron', {
     fileApi: {
         getLocalImagePath: (itemId: string) => ipcRenderer.invoke('file:get-local-image', itemId),
     },
+
+    on: (channel: string, listener: (...args: any[]) => void) => {
+        ipcRenderer.on(channel, (_, ...args) => listener(...args))
+    },
+
+    off: (channel: string, listener: (...args: any[]) => void) => {
+        ipcRenderer.off(channel, listener as any)
+    },
 })
+

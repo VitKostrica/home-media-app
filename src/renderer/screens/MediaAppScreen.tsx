@@ -65,6 +65,26 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         }
     }, [activeTab, isAuthenticated])
 
+    // Listen for player stopped event (from global backspace shortcut)
+    useEffect(() => {
+        const handlePlayerStopped = () => {
+            console.log('Player stopped - clearing VLC overlay and refreshing continue watching')
+            setVlcPlayingItem(null)
+            setTabIndex(0) // Switch to Continue Watching tab
+            loadResumeItems() // Reload the continue watching data
+        }
+
+        if (window.electron) {
+            window.electron.on?.('player:stopped', handlePlayerStopped)
+        }
+
+        return () => {
+            if (window.electron) {
+                window.electron.off?.('player:stopped', handlePlayerStopped)
+            }
+        }
+    }, [])
+
     const checkAuth = async () => {
         try {
             const config = await window.electron?.configApi?.get()
@@ -254,6 +274,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     event.preventDefault()
                     window.electron?.playerApi?.stop()
                     setVlcPlayingItem(null)
+
+                    // Refresh continue watching list and go back to it
+                    setTabIndex(0) // Switch to Continue Watching tab
+                    loadResumeItems() // Reload the continue watching data
                 }
                 return
             }

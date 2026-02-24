@@ -30,6 +30,8 @@ declare global {
             fileApi: {
                 getLocalImagePath: (itemId: string) => Promise<string>
             }
+            on: (channel: string, listener: (...args: any[]) => void) => void
+            off: (channel: string, listener: (...args: any[]) => void) => void
         }
     }
 }

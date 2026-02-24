@@ -45,6 +45,11 @@ function createWindow() {
         console.log('Backspace pressed - stopping player')
         playerService.stopPlayer()
 
+        // Notify renderer that player stopped
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('player:stopped')
+        }
+
         // Restore app window
         if (mainWindow && mainWindow.isMinimized()) {
             mainWindow.restore()
