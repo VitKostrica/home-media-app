@@ -48,19 +48,26 @@ export function launchPlayer(
 
         // Push VLC window to the front on Linux
         if (mainWindow && process.platform === 'linux') {
-            // Strategy: Use multiple approaches to ensure VLC gets focus
-            // 1. First, lower the Electron window below VLC
-            // 2. Then use various xdotool commands to raise VLC
+            // Strategy: Keep the Electron app active but behind VLC
+            // This allows backspace and other keys to still work in the app
+            // while VLC appears on top
 
             setTimeout(() => {
                 try {
                     console.log('Pushing VLC to front...')
 
-                    // Lower Electron window
+                    // Lower Electron window below VLC using wmctrl
+                    // Don't minimize - we need it to stay active for keyboard input
                     if (mainWindow) {
                         try {
                             mainWindow.setAlwaysOnTop(false) // Temporarily disable always-on-top
-                            mainWindow.minimize()
+
+                            // Use wmctrl to lower the window to the bottom
+                            const lowerWindow = spawn('bash', ['-c', 'wmctrl -l | grep -i "media" | awk \'{print $1}\' | head -1 | xargs -I {} wmctrl -i -b add,below -id {} 2>/dev/null || true'], {
+                                detached: true,
+                                stdio: 'ignore',
+                            })
+                            lowerWindow.unref()
                         } catch (err) {
                             console.warn('Failed to lower window:', err)
                         }
@@ -69,7 +76,7 @@ export function launchPlayer(
                     // Multiple xdotool commands to push VLC to front
                     // Use wmctrl and xdotool together for better reliability
                     const focusCommands = [
-                        // Try wmctrl first (more reliable)
+                        // Try wmctrl first (most reliable)
                         'wmctrl -a "VLC" 2>/dev/null',
                         // Try xdotool with window class
                         'xdotool search --class "vlc" windowactivate --sync windowraise 2>/dev/null',
@@ -89,10 +96,6 @@ export function launchPlayer(
                     console.log('VLC focus commands executed')
                 } catch (err) {
                     console.warn('Failed to push VLC to front:', err)
-                    // Fallback: minimize Electron window
-                    if (mainWindow && !mainWindow.isMinimized()) {
-                        mainWindow.minimize()
-                    }
                 }
             }, 600) // Wait 600ms for VLC to fully initialize
         }
@@ -108,9 +111,6 @@ export function launchPlayer(
             currentPlayer = null
             // Restore Electron window if player failed
             if (mainWindow) {
-                if (mainWindow.isMinimized()) {
-                    mainWindow.restore()
-                }
                 mainWindow.focus()
                 mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
             }
@@ -129,9 +129,6 @@ export function launchPlayer(
 
             // Restore Electron window when player closes
             if (mainWindow) {
-                if (mainWindow.isMinimized()) {
-                    mainWindow.restore()
-                }
                 mainWindow.focus()
                 mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
             }
