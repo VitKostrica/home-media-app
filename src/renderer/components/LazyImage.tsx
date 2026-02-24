@@ -45,6 +45,20 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
     const [failed, setFailed] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
     const hasRequestedRef = useRef(false)
+    const slotAcquiredRef = useRef(false)
+    const isMountedRef = useRef(true)
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            isMountedRef.current = false
+            // Release slot if acquired but not used
+            if (slotAcquiredRef.current) {
+                releaseSlot()
+                slotAcquiredRef.current = false
+            }
+        }
+    }, [])
 
     // Reset state when src changes
     useEffect(() => {
@@ -61,13 +75,19 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
 
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !hasRequestedRef.current) {
+                if (entries[0].isIntersecting && !hasRequestedRef.current && isMountedRef.current) {
                     hasRequestedRef.current = true
                     observer.disconnect()
 
                     // Wait for a concurrency slot, then set the src
                     requestSlot().then(() => {
-                        setLoadSrc(src)
+                        slotAcquiredRef.current = true
+                        if (isMountedRef.current) {
+                            setLoadSrc(src)
+                        } else {
+                            releaseSlot()
+                            slotAcquiredRef.current = false
+                        }
                     })
                 }
             },
@@ -81,11 +101,13 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
     const handleLoad = () => {
         setLoaded(true)
         releaseSlot()
+        slotAcquiredRef.current = false
     }
 
     const handleError = () => {
         setFailed(true)
         releaseSlot()
+        slotAcquiredRef.current = false
         onError?.()
     }
 
