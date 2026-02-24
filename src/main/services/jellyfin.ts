@@ -103,7 +103,7 @@ function mapItem(item: JellyfinItem): MappedItem {
     const token = accessToken || config.jellyfinApiKey
     const filePath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
 
-    // Generate local poster path: /path/to/Avatar 2 (2022).mp4 -> /path/to/Avatar 2 (2022)-poster.jpg
+    // Generate local poster path: /path/to/Avatar 2 (2022).mp4 -> file:///path/to/Avatar 2 (2022)-poster.jpg
     let posterUrl: string | undefined = undefined
     if (filePath) {
         // Extract directory and filename without extension
@@ -112,9 +112,9 @@ function mapItem(item: JellyfinItem): MappedItem {
         const filename = filePath.substring(lastSlash + 1)
         const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'))
 
-        // Construct local poster path
+        // Construct local poster path with file:// protocol for Electron
         const localPosterPath = `${dir}/${nameWithoutExt}-poster.jpg`
-        posterUrl = localPosterPath
+        posterUrl = `file://${localPosterPath}`
     }
 
     // Fallback to Jellyfin URL if local poster path wasn't generated
