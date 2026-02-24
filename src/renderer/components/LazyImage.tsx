@@ -48,13 +48,6 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
 
     // IntersectionObserver: only start loading when visible
     useEffect(() => {
-        hasRequestedRef.current = false
-        setLoadSrc(null)
-        setLoaded(false)
-        setFailed(false)
-    }, [src])
-
-    useEffect(() => {
         const el = containerRef.current
         if (!el || hasRequestedRef.current) return
 
