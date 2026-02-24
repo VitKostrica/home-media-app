@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, memo } from 'react'
 import '../styles/MediaCard.css'
 import LazyImage from './LazyImage'
 
@@ -30,6 +30,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
             <div className="media-card-poster">
                 {item.posterUrl && !imgFailed ? (
                     <LazyImage
+                        key={item.posterUrl}
                         src={item.posterUrl}
                         alt={item.title}
                         onError={() => setImgFailed(true)}
@@ -68,4 +69,4 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
     )
 }
 
-export default MediaCard
+export default memo(MediaCard)
