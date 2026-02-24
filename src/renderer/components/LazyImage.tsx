@@ -46,6 +46,14 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
     const containerRef = useRef<HTMLDivElement>(null)
     const hasRequestedRef = useRef(false)
 
+    // Reset state when src changes
+    useEffect(() => {
+        hasRequestedRef.current = false
+        setLoadSrc(null)
+        setLoaded(false)
+        setFailed(false)
+    }, [src])
+
     // IntersectionObserver: only start loading when visible
     useEffect(() => {
         const el = containerRef.current

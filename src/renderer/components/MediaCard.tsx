@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react'
+import React, { useState } from 'react'
 import '../styles/MediaCard.css'
 import LazyImage from './LazyImage'
 
@@ -68,4 +68,4 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
     )
 }
 
-export default memo(MediaCard)
+export default MediaCard
