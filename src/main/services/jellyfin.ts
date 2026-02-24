@@ -283,52 +283,21 @@ export async function getPlaybackInfo(
     if (!ensureAuth()) return {}
 
     try {
-        const api = getClient()
-        const response = await api.post(
-            `/Items/${itemId}/PlaybackInfo`,
-            {
-                UserId: userId,
-                StartTimeTicks: 0,
-                IsPlayback: false,
-                AutoOpenLiveStream: true,
-            },
-            { headers: getHeaders() }
-        )
-
-        const mediaSource = response.data.MediaSources?.[0]
-        if (!mediaSource) {
-            console.error('No media source found in playback info')
-            return {}
-        }
-
         const config = getConfig()
         const token = accessToken || config.jellyfinApiKey
 
-        // Prefer DirectStreamUrl, fallback to TranscodingUrl
-        let streamUrl = mediaSource.DirectStreamUrl || mediaSource.TranscodingUrl
-
-        if (streamUrl) {
-            // If it's a relative URL, prepend the base URL
-            if (streamUrl.startsWith('/')) {
-                streamUrl = config.jellyfinUrl + streamUrl
-            }
-            // Ensure API key is included
-            const separator = streamUrl.includes('?') ? '&' : '?'
-            if (!streamUrl.includes('api_key')) {
-                streamUrl = `${streamUrl}${separator}api_key=${token}`
-            }
-        } else {
-            // Fallback: construct stream URL manually
-            const itemIdGuid = idToGuid(itemId)
-            streamUrl = `${config.jellyfinUrl}/Videos/${itemIdGuid}/${itemId}/stream?api_key=${token}`
-        }
+        // Use direct stream endpoint - Jellyfin's simple streaming
+        // Format: /Videos/{ItemId}/stream
+        const streamUrl = `${config.jellyfinUrl}/Videos/${itemId}/stream?api_key=${token}`
+        
+        console.log('Using direct stream URL:', streamUrl)
 
         return {
             streamUrl,
-            mediaSourceId: mediaSource.Id || 'default',
+            mediaSourceId: 'default',
         }
     } catch (err) {
-        console.error('Failed to get playback info:', err)
+        console.error('Failed to get stream URL:', err)
         return {}
     }
 }
