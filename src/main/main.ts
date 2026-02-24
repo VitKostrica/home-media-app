@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut, protocol } from 'electron'
 import path from 'path'
 import * as fs from 'fs'
+import { URL } from 'url'
 import * as configService from './services/config'
 import * as jellyfinService from './services/jellyfin'
 import * as playerService from './services/player'
@@ -8,6 +9,25 @@ import * as playerService from './services/player'
 const isDev = process.env.NODE_ENV === 'development'
 
 let mainWindow: BrowserWindow | null = null
+
+// Register custom protocol handler for local media files
+function registerLocalProtocol() {
+    protocol.registerFileProtocol('local', (request, callback) => {
+        // Convert local://path/to/file to /path/to/file
+        const url = new URL(request.url)
+        const filePath = url.pathname
+
+        console.log('Local protocol request:', filePath)
+
+        // Check if file exists before trying to serve it
+        if (fs.existsSync(filePath)) {
+            callback({ path: filePath })
+        } else {
+            console.warn('File not found:', filePath)
+            callback({ error: -6 }) // NET_ERROR(FILE_NOT_FOUND)
+        }
+    })
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -64,7 +84,11 @@ function createWindow() {
     })
 }
 
-app.on('ready', createWindow)
+// Register protocol before app is ready
+app.on('ready', () => {
+    registerLocalProtocol()
+    createWindow()
+})
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
