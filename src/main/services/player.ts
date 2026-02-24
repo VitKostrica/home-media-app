@@ -49,20 +49,37 @@ export function launchPlayer(
         // Minimize or hide Electron window to bring VLC to front
         // This ensures the fullscreen player is visible
         if (mainWindow && process.platform === 'linux') {
-            setImmediate(() => {
+            // Immediately minimize the Electron window to clear it from screen
+            try {
+                mainWindow.minimize()
+            } catch (err) {
+                console.warn('Failed to minimize window:', err)
+            }
+
+            // After a delay to let VLC fully start, use xdotool to ensure it's focused
+            setTimeout(() => {
                 try {
                     // Use xdotool to raise VLC window on Linux
-                    const xdotool = spawn('bash', ['-c', 'sleep 0.2 && xdotool search --name "vlc" windowactivate || true'], {
+                    // First, minimize Electron window again just to be sure
+                    if (mainWindow && !mainWindow.isMinimized()) {
+                        mainWindow.minimize()
+                    }
+
+                    // Search for VLC by window name and activate it
+                    const xdotool = spawn('bash', [
+                        '-c',
+                        'xdotool search --class "vlc" windowactivate --sync 2>/dev/null || xdotool search --name "vlc" windowactivate 2>/dev/null || true',
+                    ], {
                         detached: true,
                         stdio: 'ignore',
                     })
                     xdotool.unref()
+
+                    console.log('VLC window activation command sent')
                 } catch (err) {
                     console.warn('Failed to focus VLC with xdotool:', err)
-                    // Fallback: minimize Electron window
-                    mainWindow.minimize()
                 }
-            })
+            }, 800) // Wait 800ms for VLC to fully start and open
         }
 
         // Report playback start to Jellyfin
