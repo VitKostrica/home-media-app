@@ -33,6 +33,7 @@ interface MappedItem {
     type: 'movie' | 'series' | 'episode'
     year?: number
     posterUrl?: string
+    posterUrlFallback?: string
     backdropUrl?: string
     overview?: string
     duration?: number
@@ -103,23 +104,40 @@ function mapItem(item: JellyfinItem): MappedItem {
     const token = accessToken || config.jellyfinApiKey
     const filePath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
 
-    // Generate local poster path: /path/to/Avatar 2 (2022).mp4 -> local:///path/to/Avatar 2 (2022)-poster.jpg
+    // Generate local poster path
     let posterUrl: string | undefined = undefined
-    if (filePath) {
-        // Extract directory and filename without extension
-        const lastSlash = filePath.lastIndexOf('/')
-        const dir = filePath.substring(0, lastSlash)
-        const filename = filePath.substring(lastSlash + 1)
-        const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'))
+    let posterUrlFallback: string | undefined = undefined
 
-        // Construct local poster path with custom local:// protocol for Electron
-        const localPosterPath = `${dir}/${nameWithoutExt}-poster.jpg`
+    // Always generate fallback URL from Jellyfin for cases where local file doesn't exist
+    if (item.ImageTags?.Primary) {
+        posterUrlFallback = `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
+    }
+
+    if (filePath) {
+        let localPosterPath: string | undefined
+
+        if (item.Type === 'Series') {
+            // For shows: use folder.jpg in the show's root directory
+            // filePath is already the show folder path
+            const dir = filePath.endsWith('/') ? filePath.slice(0, -1) : filePath
+            localPosterPath = `${dir}/folder.jpg`
+        } else {
+            // For movies and episodes: use {name}-poster.jpg in the same directory
+            const lastSlash = filePath.lastIndexOf('/')
+            const dir = filePath.substring(0, lastSlash)
+            const filename = filePath.substring(lastSlash + 1)
+            const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'))
+            localPosterPath = `${dir}/${nameWithoutExt}-poster.jpg`
+        }
+
+        // Construct poster path with custom local:// protocol for Electron
         posterUrl = `local://${localPosterPath}`
     }
 
-    // Fallback to Jellyfin URL if local poster path wasn't generated
-    if (!posterUrl && item.ImageTags?.Primary) {
-        posterUrl = `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
+    // If no local path was generated, use the fallback directly
+    if (!posterUrl && posterUrlFallback) {
+        posterUrl = posterUrlFallback
+        posterUrlFallback = undefined // No need for fallback if primary is already Jellyfin
     }
 
     return {
@@ -128,6 +146,7 @@ function mapItem(item: JellyfinItem): MappedItem {
         type: item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode',
         year: item.ProductionYear,
         posterUrl,
+        posterUrlFallback,
         backdropUrl: item.BackdropImageTags?.length
             ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Backdrop?tag=${item.BackdropImageTags[0]}${token ? `&api_key=${token}` : ''}`
             : undefined,

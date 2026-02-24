@@ -6,6 +6,7 @@ interface MediaCardItem {
     id: string
     title: string
     posterUrl?: string
+    posterUrlFallback?: string
     watched: boolean
     playedPercentage?: number
     year?: number
@@ -21,6 +22,19 @@ interface MediaCardProps {
 
 const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect, showProgress = true }) => {
     const [imgFailed, setImgFailed] = useState(false)
+    const [useFallback, setUseFallback] = useState(false)
+
+    // Determine which image URL to use
+    const imageUrl = useFallback ? item.posterUrlFallback : item.posterUrl
+
+    // Handle image load failure - try fallback if available
+    const handleImageError = () => {
+        if (!useFallback && item.posterUrlFallback) {
+            setUseFallback(true)
+        } else {
+            setImgFailed(true)
+        }
+    }
 
     return (
         <div
@@ -28,11 +42,11 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
             onClick={onSelect}
         >
             <div className="media-card-poster">
-                {item.posterUrl && !imgFailed ? (
+                {imageUrl && !imgFailed ? (
                     <LazyImage
-                        src={item.posterUrl}
+                        src={imageUrl}
                         alt={item.title}
-                        onError={() => setImgFailed(true)}
+                        onError={handleImageError}
                     />
                 ) : (
                     <div className="media-card-placeholder">
