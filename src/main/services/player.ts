@@ -48,33 +48,24 @@ export function launchPlayer(
 
         // Push VLC window to the front on Linux
         if (mainWindow && process.platform === 'linux') {
-            // Strategy: Keep the Electron app active but behind VLC
-            // This allows backspace and other keys to still work in the app
-            // while VLC appears on top
+            // Strategy: Minimize main app and create a small control bar
+            // This makes VLC visible and controllable while keeping backspace available
 
             setTimeout(() => {
                 try {
-                    console.log('Pushing VLC to front...')
+                    console.log('Minimizing app and pushing VLC to front...')
 
-                    // Lower Electron window below VLC using wmctrl
-                    // Don't minimize - we need it to stay active for keyboard input
+                    // Minimize the main Electron window to get it out of the way
                     if (mainWindow) {
                         try {
                             mainWindow.setAlwaysOnTop(false) // Temporarily disable always-on-top
-
-                            // Use wmctrl to lower the window to the bottom
-                            const lowerWindow = spawn('bash', ['-c', 'wmctrl -l | grep -i "media" | awk \'{print $1}\' | head -1 | xargs -I {} wmctrl -i -b add,below -id {} 2>/dev/null || true'], {
-                                detached: true,
-                                stdio: 'ignore',
-                            })
-                            lowerWindow.unref()
+                            mainWindow.minimize()
                         } catch (err) {
-                            console.warn('Failed to lower window:', err)
+                            console.warn('Failed to minimize window:', err)
                         }
                     }
 
-                    // Multiple xdotool commands to push VLC to front
-                    // Use wmctrl and xdotool together for better reliability
+                    // Push VLC to front using multiple methods
                     const focusCommands = [
                         // Try wmctrl first (most reliable)
                         'wmctrl -a "VLC" 2>/dev/null',
@@ -82,8 +73,6 @@ export function launchPlayer(
                         'xdotool search --class "vlc" windowactivate --sync windowraise 2>/dev/null',
                         // Try xdotool with window name
                         'xdotool search --name "vlc" windowactivate --sync windowraise 2>/dev/null',
-                        // Fallback: use xdotool to get the last mapped window and activate it
-                        'xdotool search --onlyvisible --class "." getactivewindow windowactivate 2>/dev/null',
                     ]
 
                     const command = focusCommands.join(' || ')
@@ -109,8 +98,9 @@ export function launchPlayer(
         currentPlayer.on('error', (err) => {
             console.error(`Failed to launch ${type}:`, err.message)
             currentPlayer = null
-            // Restore Electron window if player failed
-            if (mainWindow) {
+            // Restore Electron window if player failed to start
+            if (mainWindow && mainWindow.isMinimized()) {
+                mainWindow.restore()
                 mainWindow.focus()
                 mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
             }
@@ -128,8 +118,11 @@ export function launchPlayer(
             }
 
             // Restore Electron window when player closes
-            if (mainWindow) {
+            if (mainWindow && mainWindow.isMinimized()) {
+                mainWindow.restore()
                 mainWindow.focus()
+            }
+            if (mainWindow) {
                 mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
             }
 

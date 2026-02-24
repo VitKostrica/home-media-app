@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import path from 'path'
 import * as fs from 'fs'
 import * as configService from './services/config'
@@ -40,8 +40,22 @@ function createWindow() {
         mainWindow.webContents.openDevTools()
     }
 
+    // Register global backspace shortcut to close player even when minimized
+    globalShortcut.register('BackSpace', () => {
+        console.log('Backspace pressed - stopping player')
+        playerService.stopPlayer()
+
+        // Restore app window
+        if (mainWindow && mainWindow.isMinimized()) {
+            mainWindow.restore()
+            mainWindow.focus()
+        }
+    })
+
     mainWindow.on('closed', () => {
         mainWindow = null
+        // Unregister shortcuts when window closes
+        globalShortcut.unregisterAll()
     })
 }
 
