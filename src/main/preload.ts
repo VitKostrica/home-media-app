@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('electron', {
         getEpisodes: (seriesId: string, seasonId: string) =>
             ipcRenderer.invoke('jellyfin:get-episodes', seriesId, seasonId),
         getResumeItems: () => ipcRenderer.invoke('jellyfin:get-resume-items'),
+        getPlaybackInfo: (itemId: string) => ipcRenderer.invoke('jellyfin:get-playback-info', itemId),
+        reportPlaybackStart: (itemId: string, positionTicks: number) => ipcRenderer.invoke('jellyfin:report-playback-start', itemId, positionTicks),
         reportProgress: (itemId: string, positionTicks: number) =>
             ipcRenderer.invoke('jellyfin:report-progress', itemId, positionTicks),
         reportStopped: (itemId: string, positionTicks: number) =>

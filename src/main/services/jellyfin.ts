@@ -46,6 +46,15 @@ interface MappedItem {
     episodeNumber?: number
 }
 
+interface PlaybackInfoResponse {
+    MediaSources?: Array<{
+        DirectStreamUrl?: string
+        TranscodingUrl?: string
+        Path?: string
+        Protocol?: string
+    }>
+}
+
 // Jellyfin auth header
 const CLIENT_INFO = 'MediaBrowser Client="Home Media App", Device="Linux PC", DeviceId="home-media-app-electron", Version="0.1.0"'
 
@@ -117,6 +126,13 @@ function mapItem(item: JellyfinItem): MappedItem {
         seasonNumber: item.ParentIndexNumber,
         episodeNumber: item.IndexNumber,
     }
+}
+
+/** Convert item ID to GUID format with hyphens */
+function idToGuid(id: string): string {
+    if (id.includes('-')) return id // already GUID format
+    if (id.length !== 32) return id // not a valid hex ID
+    return `${id.substring(0, 8)}-${id.substring(8, 12)}-${id.substring(12, 16)}-${id.substring(16, 20)}-${id.substring(20, 32)}`
 }
 
 // ── Public API ───────────────────────────────────────────────
@@ -257,6 +273,63 @@ export async function getResumeItems(): Promise<MappedItem[]> {
     } catch (err) {
         console.error('Failed to fetch resume items:', err)
         return []
+    }
+}
+
+/** Get playback info for an item (gets the stream URL) */
+export async function getPlaybackInfo(
+    itemId: string
+): Promise<{ streamUrl?: string; mediaSourceId?: string }> {
+    if (!ensureAuth()) return {}
+
+    try {
+        const api = getClient()
+        const response = await api.post(
+            `/Items/${itemId}/PlaybackInfo`,
+            {
+                UserId: userId,
+                StartTimeTicks: 0,
+                IsPlayback: false,
+                AutoOpenLiveStream: true,
+            },
+            { headers: getHeaders() }
+        )
+
+        const mediaSource = response.data.MediaSources?.[0]
+        if (!mediaSource) {
+            console.error('No media source found in playback info')
+            return {}
+        }
+
+        const config = getConfig()
+        const token = accessToken || config.jellyfinApiKey
+
+        // Prefer DirectStreamUrl, fallback to TranscodingUrl
+        let streamUrl = mediaSource.DirectStreamUrl || mediaSource.TranscodingUrl
+
+        if (streamUrl) {
+            // If it's a relative URL, prepend the base URL
+            if (streamUrl.startsWith('/')) {
+                streamUrl = config.jellyfinUrl + streamUrl
+            }
+            // Ensure API key is included
+            const separator = streamUrl.includes('?') ? '&' : '?'
+            if (!streamUrl.includes('api_key')) {
+                streamUrl = `${streamUrl}${separator}api_key=${token}`
+            }
+        } else {
+            // Fallback: construct stream URL manually
+            const itemIdGuid = idToGuid(itemId)
+            streamUrl = `${config.jellyfinUrl}/Videos/${itemIdGuid}/${itemId}/stream?api_key=${token}`
+        }
+
+        return {
+            streamUrl,
+            mediaSourceId: mediaSource.Id || 'default',
+        }
+    } catch (err) {
+        console.error('Failed to get playback info:', err)
+        return {}
     }
 }
 

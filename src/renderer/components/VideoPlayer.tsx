@@ -64,17 +64,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const initializeVideo = async () => {
             let videoSource = filePath
 
-            // Try to use Jellyfin stream endpoint if we have the item ID
+            // Try to use Jellyfin API to get proper stream URL
             if (jellyfinItemId) {
                 try {
-                    const config = await window.electron?.configApi?.get()
-                    if (config?.jellyfinUrl && config?.jellyfinApiKey) {
-                        // Use Jellyfin's stream endpoint
-                        videoSource = `${config.jellyfinUrl}/Videos/${jellyfinItemId}/stream?api_key=${config.jellyfinApiKey}&mediaSourceId=default`
-                        console.log('VideoPlayer: Using Jellyfin stream:', videoSource)
+                    const playbackInfo = await window.electron?.jellyfinApi?.getPlaybackInfo?.(jellyfinItemId)
+                    if (playbackInfo?.streamUrl) {
+                        videoSource = playbackInfo.streamUrl
+                        console.log('VideoPlayer: Got Jellyfin stream URL:', videoSource)
+                        
+                        // Report playback start to Jellyfin
+                        const startPositionTicks = startPosition * 10000000
+                        await window.electron?.jellyfinApi?.reportPlaybackStart?.(jellyfinItemId, startPositionTicks)
+                    } else {
+                        throw new Error('No stream URL from playback info')
                     }
                 } catch (err) {
-                    console.error('Failed to get Jellyfin config, falling back to file path:', err)
+                    console.error('Failed to get Jellyfin playback info, falling back to file path:', err)
                     // Fall back to file path
                     videoSource = filePath.startsWith('file://') ? filePath : `file://${filePath}`
                 }
