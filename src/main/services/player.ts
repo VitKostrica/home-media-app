@@ -46,40 +46,55 @@ export function launchPlayer(
             currentPlayer = spawn('vlc', args, { detached: true, stdio: 'ignore' })
         }
 
-        // Minimize or hide Electron window to bring VLC to front
-        // This ensures the fullscreen player is visible
+        // Push VLC window to the front on Linux
         if (mainWindow && process.platform === 'linux') {
-            // Immediately minimize the Electron window to clear it from screen
-            try {
-                mainWindow.minimize()
-            } catch (err) {
-                console.warn('Failed to minimize window:', err)
-            }
+            // Strategy: Use multiple approaches to ensure VLC gets focus
+            // 1. First, lower the Electron window below VLC
+            // 2. Then use various xdotool commands to raise VLC
 
-            // After a delay to let VLC fully start, use xdotool to ensure it's focused
             setTimeout(() => {
                 try {
-                    // Use xdotool to raise VLC window on Linux
-                    // First, minimize Electron window again just to be sure
-                    if (mainWindow && !mainWindow.isMinimized()) {
-                        mainWindow.minimize()
+                    console.log('Pushing VLC to front...')
+
+                    // Lower Electron window
+                    if (mainWindow) {
+                        try {
+                            mainWindow.setAlwaysOnTop(false) // Temporarily disable always-on-top
+                            mainWindow.minimize()
+                        } catch (err) {
+                            console.warn('Failed to lower window:', err)
+                        }
                     }
 
-                    // Search for VLC by window name and activate it
-                    const xdotool = spawn('bash', [
-                        '-c',
-                        'xdotool search --class "vlc" windowactivate --sync 2>/dev/null || xdotool search --name "vlc" windowactivate 2>/dev/null || true',
-                    ], {
+                    // Multiple xdotool commands to push VLC to front
+                    // Use wmctrl and xdotool together for better reliability
+                    const focusCommands = [
+                        // Try wmctrl first (more reliable)
+                        'wmctrl -a "VLC" 2>/dev/null',
+                        // Try xdotool with window class
+                        'xdotool search --class "vlc" windowactivate --sync windowraise 2>/dev/null',
+                        // Try xdotool with window name
+                        'xdotool search --name "vlc" windowactivate --sync windowraise 2>/dev/null',
+                        // Fallback: use xdotool to get the last mapped window and activate it
+                        'xdotool search --onlyvisible --class "." getactivewindow windowactivate 2>/dev/null',
+                    ]
+
+                    const command = focusCommands.join(' || ')
+                    const xdotool = spawn('bash', ['-c', command], {
                         detached: true,
                         stdio: 'ignore',
                     })
                     xdotool.unref()
 
-                    console.log('VLC window activation command sent')
+                    console.log('VLC focus commands executed')
                 } catch (err) {
-                    console.warn('Failed to focus VLC with xdotool:', err)
+                    console.warn('Failed to push VLC to front:', err)
+                    // Fallback: minimize Electron window
+                    if (mainWindow && !mainWindow.isMinimized()) {
+                        mainWindow.minimize()
+                    }
                 }
-            }, 800) // Wait 800ms for VLC to fully start and open
+            }, 600) // Wait 600ms for VLC to fully initialize
         }
 
         // Report playback start to Jellyfin
@@ -92,9 +107,12 @@ export function launchPlayer(
             console.error(`Failed to launch ${type}:`, err.message)
             currentPlayer = null
             // Restore Electron window if player failed
-            if (mainWindow && mainWindow.isMinimized()) {
-                mainWindow.restore()
+            if (mainWindow) {
+                if (mainWindow.isMinimized()) {
+                    mainWindow.restore()
+                }
                 mainWindow.focus()
+                mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
             }
         })
 
@@ -110,9 +128,12 @@ export function launchPlayer(
             }
 
             // Restore Electron window when player closes
-            if (mainWindow && mainWindow.isMinimized()) {
-                mainWindow.restore()
+            if (mainWindow) {
+                if (mainWindow.isMinimized()) {
+                    mainWindow.restore()
+                }
                 mainWindow.focus()
+                mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
             }
 
             currentPlayer = null

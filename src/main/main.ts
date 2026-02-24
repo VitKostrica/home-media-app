@@ -13,7 +13,8 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1920,
         height: 1080,
-        fullscreen: true,
+        fullscreen: false,
+        frame: false, // Borderless window
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
@@ -26,6 +27,7 @@ function createWindow() {
     // Configure for kiosk mode
     mainWindow.setMenu(null)
     mainWindow.setAlwaysOnTop(true)
+    mainWindow.maximize() // Maximize instead of fullscreen for alt+tab ability
 
     const startUrl = isDev
         ? 'http://localhost:3000'
