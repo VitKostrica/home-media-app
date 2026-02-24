@@ -73,7 +73,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             console.log('Player stopped - clearing VLC overlay and refreshing continue watching')
             setVlcPlayingItem(null)
             setActiveTab(0) // Switch to Continue Watching tab
-            loadResumeItems() // Reload the continue watching data
+            fetchItems() // Reload the continue watching data
         }
 
         if (window.electron) {
@@ -279,7 +279,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
                     // Refresh continue watching list and go back to it
                     setActiveTab(0) // Switch to Continue Watching tab
-                    loadResumeItems() // Reload the continue watching data
+                    fetchItems() // Reload the continue watching data
                 }
                 return
             }

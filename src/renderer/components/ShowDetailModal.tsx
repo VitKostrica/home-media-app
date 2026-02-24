@@ -228,6 +228,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                         <div
                                             key={season.id}
                                             className={`season-card ${idx === selectedIndex ? 'focused' : ''}`}
+                                            onClick={() => handleSeasonSelect(season)}
                                         >
                                             <div className="season-poster">
                                                 {season.posterUrl ? (
@@ -265,6 +266,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                     <div
                                         key={episode.id}
                                         className={`episode-card ${idx === selectedIndex ? 'focused' : ''}`}
+                                        onClick={() => onPlay(episode.id, episode.title)}
                                     >
                                         <div className="episode-poster">
                                             {episode.posterUrl ? (
@@ -276,10 +278,15 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                             )}
                                         </div>
                                         <div className="episode-info">
+                                            <p className="episode-number">
+                                                {episode.episodeNumber !== undefined ? `Episode ${episode.episodeNumber}` : 'Episode'}
+                                            </p>
                                             <p className="episode-title">
-                                                {episode.episodeNumber && `E${episode.episodeNumber}: `}
                                                 {episode.title}
                                             </p>
+                                            {episode.overview && (
+                                                <p className="episode-description">{episode.overview}</p>
+                                            )}
                                             {episode.playedPercentage && episode.playedPercentage > 0 && !episode.watched && (
                                                 <div className="episode-progress-bar">
                                                     <div

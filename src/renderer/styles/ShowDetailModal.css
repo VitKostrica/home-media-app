@@ -265,17 +265,35 @@
     padding: 12px;
 }
 
+.episode-number {
+    font-size: 11px;
+    color: #0066cc;
+    text-transform: uppercase;
+    margin: 0 0 4px 0;
+    font-weight: bold;
+}
+
 .episode-title {
     font-size: 13px;
     font-weight: 600;
     color: #fff;
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin: 0 0 6px 0;
+    white-space: normal;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.episode-description {
+    font-size: 11px;
+    color: #aaa;
+    margin: 4px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
 }
 
 .episode-progress-bar {
