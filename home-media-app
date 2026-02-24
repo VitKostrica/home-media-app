@@ -1,0 +1,6 @@
+#!/bin/bash
+# Home Media Center Launcher
+# This script launches the Electron app from the installation directory
+
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NODE_ENV=production electron "$APP_DIR" "$@"

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Home Media Center
+Comment=TV-like media center with Jellyfin integration
+Exec=/home/kostra/Custom-apps/home-media-app/home-media-app %U
+Icon=media-player
+Terminal=false
+Categories=AudioVideo;
+Keywords=media;center;jellyfin;
+StartupNotify=true
