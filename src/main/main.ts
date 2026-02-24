@@ -15,12 +15,17 @@ function registerLocalProtocol() {
     protocol.registerFileProtocol('local', (request, callback) => {
         // Convert local://path/to/file to /path/to/file
         const url = new URL(request.url)
-        const filePath = url.pathname
+        let filePath = url.pathname
 
-        console.log('Local protocol request:', filePath)
+        // Decode URL-encoded characters (spaces, diacritics, etc.)
+        // Example: %C5%AF (ů), %20 (space), etc.
+        filePath = decodeURIComponent(filePath)
+
+        console.log('Local protocol request (decoded):', filePath)
 
         // Check if file exists before trying to serve it
         if (fs.existsSync(filePath)) {
+            console.log('Local file found, serving:', filePath)
             callback({ path: filePath })
         } else {
             console.warn('File not found:', filePath)
