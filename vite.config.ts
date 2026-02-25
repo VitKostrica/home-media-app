@@ -3,7 +3,9 @@ import { defineConfig } from 'vite'
 import path from 'path'
 
 // https://vitejs.dev/config/
+// base: './' required for Electron production (file:// protocol)
 export default defineConfig({
+    base: './',
     plugins: [react()],
     resolve: {
         alias: {
