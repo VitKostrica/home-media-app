@@ -13,37 +13,37 @@ const HOME_TILES: AppTile[] = [
     {
         id: 'custom-media',
         title: 'Custom Media',
-        icon: '🎬',
+        icon: '/app-icons/jellyfin.png',
         description: 'Local movies & shows',
     },
     {
         id: 'youtube',
         title: 'YouTube',
-        icon: '▶️',
+        icon: '/app-icons/youtube.png',
         description: 'Online videos',
     },
     {
         id: 'disney-plus',
         title: 'Disney+',
-        icon: '✨',
+        icon: '/app-icons/disney.png',
         description: 'Disney content',
     },
     {
         id: 'prime-video',
         title: 'Prime Video',
-        icon: '🎯',
+        icon: '/app-icons/primevideo.png',
         description: 'Prime content',
     },
     {
         id: 'sweet-tv',
         title: 'Sweet.tv',
-        icon: '📺',
+        icon: '/app-icons/sweet.png',
         description: 'Sweet.tv service',
     },
     {
         id: 'jellyfin',
         title: 'Jellyfin',
-        icon: '🎥',
+        icon: '/app-icons/jellyfin.png',
         description: 'Personal media server',
     },
 ]

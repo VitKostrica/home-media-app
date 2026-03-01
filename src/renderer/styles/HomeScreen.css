@@ -3,7 +3,9 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+    background:
+        linear-gradient(135deg, rgba(10, 14, 39, 0.82) 0%, rgba(26, 31, 58, 0.86) 100%),
+        url('/app-icons/background.jpg') center center / cover no-repeat;
     color: #fff;
     padding: 0;
     margin: 0;
