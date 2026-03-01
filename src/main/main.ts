@@ -121,6 +121,16 @@ ipcMain.handle('app:close', () => {
     }
 })
 
+ipcMain.handle('app:restart', () => {
+    try {
+        playerService.stopPlayer()
+    } catch {
+        // Ignore player stop errors during restart
+    }
+    app.relaunch()
+    app.exit(0)
+})
+
 // ── Config IPC ───────────────────────────────────────────────
 
 ipcMain.handle('config:get', () => {

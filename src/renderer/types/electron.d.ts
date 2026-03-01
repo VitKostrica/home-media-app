@@ -2,6 +2,7 @@ declare global {
     interface Window {
         electron: {
             close: () => void
+            restart: () => void
             playerApi: {
                 launch: (player: string, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) => Promise<void>
                 play: () => Promise<void>

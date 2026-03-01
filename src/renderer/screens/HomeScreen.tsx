@@ -101,11 +101,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         window.electron?.close()
     }
 
+    const handleRestart = () => {
+        console.log('Restarting app')
+        window.electron?.restart()
+    }
+
     return (
         <div className="home-screen">
             <div className="home-header">
                 <h1>Home Media Center</h1>
-                <button className="close-button" onClick={handleClose} title="Close">✕</button>
+                <div className="home-actions">
+                    <button className="restart-button" onClick={handleRestart} title="Restart">↻</button>
+                    <button className="close-button" onClick={handleClose} title="Close">✕</button>
+                </div>
             </div>
 
             <div className="tiles-grid">

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('electron', {
     close: () => ipcRenderer.invoke('app:close'),
+    restart: () => ipcRenderer.invoke('app:restart'),
 
     playerApi: {
         launch: (player: string, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) =>
