@@ -128,10 +128,16 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     api.getResumeItems(),
                     api.getNextUpItems(),
                 ])
+                console.log(
+                    `[Continue Watching] resume=${resumeItems?.length || 0}, nextUp=${nextUpItems?.length || 0}`
+                )
                 const resumeUnique = (resumeItems || []).filter((item) => item?.id)
                 const seenIds = new Set<string>(resumeUnique.map((item) => item.id))
                 const nextUpUnique = (nextUpItems || []).filter(
                     (item) => item?.id && !seenIds.has(item.id)
+                )
+                console.log(
+                    `[Continue Watching] unique resume=${resumeUnique.length}, unique nextUp=${nextUpUnique.length}`
                 )
 
                 // Keep room for Next Up so it is always visible on this tab.

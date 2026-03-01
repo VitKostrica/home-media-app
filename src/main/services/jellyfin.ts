@@ -324,7 +324,26 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
             },
             headers: getHeaders(),
         })
-        return (response.data.Items || []).map(mapItem)
+        const primaryItems = (response.data.Items || []).map(mapItem)
+        if (primaryItems.length > 0) {
+            console.log(`[Jellyfin] NextUp primary query returned ${primaryItems.length} items`)
+            return primaryItems
+        }
+
+        // Fallback for servers that are strict about NextUp filter params.
+        const fallbackResponse = await api.get('/Shows/NextUp', {
+            params: {
+                Limit: 24,
+                UserId: userId,
+                Fields: 'Overview,Path,MediaSources,UserData',
+                DisableFirstEpisode: false,
+            },
+            headers: getHeaders(),
+        })
+
+        const fallbackItems = (fallbackResponse.data.Items || []).map(mapItem)
+        console.log(`[Jellyfin] NextUp fallback query returned ${fallbackItems.length} items`)
+        return fallbackItems
     } catch (err) {
         handleAuthError(err)
         console.error('Failed to fetch next up items:', err)
