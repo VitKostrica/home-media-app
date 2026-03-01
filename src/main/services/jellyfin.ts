@@ -458,6 +458,9 @@ export async function reportPlaybackStart(itemId: string, positionTicks: number 
 
     try {
         const api = getClient()
+        console.log(
+            `[JellyfinPlayback] -> Playing item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
+        )
         await api.post(
             '/Sessions/Playing',
             {
@@ -467,9 +470,13 @@ export async function reportPlaybackStart(itemId: string, positionTicks: number 
             },
             { headers: getHeaders() }
         )
+        console.log('[JellyfinPlayback] <- Playing ok')
     } catch (err) {
         handleAuthError(err)
-        console.error('Failed to report playback start:', err)
+        const e: any = err
+        console.error(
+            `[JellyfinPlayback] Playing failed status=${e?.response?.status || 'unknown'} message=${e?.message || err}`
+        )
     }
 }
 
@@ -479,6 +486,9 @@ export async function reportProgress(itemId: string, positionTicks: number): Pro
 
     try {
         const api = getClient()
+        console.log(
+            `[JellyfinPlayback] -> Progress item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
+        )
         await api.post(
             '/Sessions/Playing/Progress',
             {
@@ -488,9 +498,13 @@ export async function reportProgress(itemId: string, positionTicks: number): Pro
             },
             { headers: getHeaders() }
         )
+        console.log('[JellyfinPlayback] <- Progress ok')
     } catch (err) {
         handleAuthError(err)
-        console.error('Failed to report progress:', err)
+        const e: any = err
+        console.error(
+            `[JellyfinPlayback] Progress failed status=${e?.response?.status || 'unknown'} message=${e?.message || err}`
+        )
     }
 }
 
@@ -500,6 +514,9 @@ export async function reportStopped(itemId: string, positionTicks: number): Prom
 
     try {
         const api = getClient()
+        console.log(
+            `[JellyfinPlayback] -> Stopped item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
+        )
         await api.post(
             '/Sessions/Playing/Stopped',
             {
@@ -508,8 +525,12 @@ export async function reportStopped(itemId: string, positionTicks: number): Prom
             },
             { headers: getHeaders() }
         )
+        console.log('[JellyfinPlayback] <- Stopped ok')
     } catch (err) {
         handleAuthError(err)
-        console.error('Failed to report playback stopped:', err)
+        const e: any = err
+        console.error(
+            `[JellyfinPlayback] Stopped failed status=${e?.response?.status || 'unknown'} message=${e?.message || err}`
+        )
     }
 }

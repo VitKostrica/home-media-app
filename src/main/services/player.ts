@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'child_process'
 import { BrowserWindow } from 'electron'
 import * as jellyfinService from './jellyfin'
+import path from 'path'
 
 type PlayerType = 'mpv' | 'vlc'
 
@@ -11,6 +12,10 @@ let playbackStartedAtMs = 0
 let playbackStartPositionSec = 0
 let currentDurationSec = 0
 let stopRequestedByUser = false
+
+function ticksToSec(ticks: number): number {
+    return Math.floor(ticks / 10000000)
+}
 
 function clearProgressInterval() {
     if (progressInterval) {
@@ -43,7 +48,11 @@ function getReportedStopPositionTicks(): number {
 function startProgressReporting(itemId: string) {
     clearProgressInterval()
     progressInterval = setInterval(() => {
-        jellyfinService.reportProgress(itemId, getEstimatedPositionTicks()).catch(() => { })
+        const ticks = getEstimatedPositionTicks()
+        console.log(`[PlaybackDebug] Progress tick item=${itemId} sec=${ticksToSec(ticks)} ticks=${ticks}`)
+        jellyfinService.reportProgress(itemId, ticks).catch((err) => {
+            console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
+        })
     }, 10000)
 }
 
@@ -69,6 +78,9 @@ export function launchPlayer(
     currentItemId = jellyfinItemId || null
     stopRequestedByUser = false
     currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
+    console.log(
+        `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
+    )
 
     try {
         let args: string[]
@@ -139,8 +151,15 @@ export function launchPlayer(
         playbackStartedAtMs = Date.now()
         if (currentItemId) {
             const positionTicks = playbackStartPositionSec * 10000000
-            jellyfinService.reportPlaybackStart(currentItemId, positionTicks).catch(() => { })
+            console.log(
+                `[PlaybackDebug] reportPlaybackStart item=${currentItemId} sec=${playbackStartPositionSec} ticks=${positionTicks}`
+            )
+            jellyfinService.reportPlaybackStart(currentItemId, positionTicks).catch((err) => {
+                console.error('[PlaybackDebug] reportPlaybackStart failed:', err?.message || err)
+            })
             startProgressReporting(currentItemId)
+        } else {
+            console.warn('[PlaybackDebug] Missing jellyfin item id, progress/stopped will not be reported')
         }
 
         currentPlayer.on('error', (err) => {
@@ -165,8 +184,16 @@ export function launchPlayer(
 
             // Report playback stopped to Jellyfin
             if (currentItemId) {
+                const estimatedTicks = getEstimatedPositionTicks()
                 const positionTicks = getReportedStopPositionTicks()
-                jellyfinService.reportStopped(currentItemId, positionTicks).catch(() => { })
+                console.log(
+                    `[PlaybackDebug] reportStopped item=${currentItemId} code=${code} stopRequested=${stopRequestedByUser} startSec=${playbackStartPositionSec} estimatedSec=${ticksToSec(estimatedTicks)} reportedSec=${ticksToSec(positionTicks)} durationSec=${currentDurationSec || 0}`
+                )
+                jellyfinService.reportStopped(currentItemId, positionTicks).catch((err) => {
+                    console.error('[PlaybackDebug] reportStopped failed:', err?.message || err)
+                })
+            } else {
+                console.warn('[PlaybackDebug] Skipping reportStopped because item id is missing')
             }
 
             // Restore Electron window when player closes
@@ -199,6 +226,9 @@ export function launchPlayer(
 export function stopPlayer(): void {
     if (currentPlayer && !currentPlayer.killed) {
         stopRequestedByUser = true
+        console.log(
+            `[PlaybackDebug] stopPlayer called item=${currentItemId || 'none'} startSec=${playbackStartPositionSec} durationSec=${currentDurationSec || 0}`
+        )
         currentPlayer.kill()
     }
 }
