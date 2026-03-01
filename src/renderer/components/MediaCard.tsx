@@ -8,6 +8,8 @@ interface MediaCardItem {
     posterUrl?: string
     watched: boolean
     playedPercentage?: number
+    resumePosition?: number
+    duration?: number
     year?: number
     type: string
     seriesName?: string
@@ -29,6 +31,12 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
         typeof item.seasonNumber === 'number' && typeof item.episodeNumber === 'number'
             ? `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`
             : ''
+    const computedProgress =
+        item.playedPercentage && item.playedPercentage > 0
+            ? item.playedPercentage
+            : item.duration && item.duration > 0 && item.resumePosition && item.resumePosition > 0
+                ? Math.min(99, Math.max(0, (item.resumePosition / item.duration) * 100))
+                : 0
 
     return (
         <div
@@ -56,11 +64,11 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
                 )}
 
                 {/* Progress bar overlay at bottom of poster */}
-                {showProgress && (item.playedPercentage || 0) > 0 && !item.watched && (
+                {showProgress && computedProgress > 0 && !item.watched && (
                     <div className="media-card-progress">
                         <div
                             className="media-card-progress-fill"
-                            style={{ width: `${item.playedPercentage}%` }}
+                            style={{ width: `${computedProgress}%` }}
                         />
                     </div>
                 )}

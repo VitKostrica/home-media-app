@@ -303,7 +303,7 @@ export async function getResumeItems(): Promise<MappedItem[]> {
             params: {
                 Limit: 50,
                 Recursive: true,
-                Fields: 'Overview,Path,MediaSources,UserData,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
+                Fields: 'Overview,Path,MediaSources,UserData,RunTimeTicks,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
                 SortBy: 'DatePlayed',
                 SortOrder: 'Descending',
             },
@@ -326,7 +326,7 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
         const response = await api.get('/Shows/NextUp', {
             params: {
                 Limit: 24,
-                Fields: 'PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount,UserData,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
+                Fields: 'PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount,UserData,RunTimeTicks,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
                 UserId: userId,
                 ImageTypeLimit: 1,
                 EnableImageTypes: 'Primary,Backdrop,Banner,Thumb',
@@ -349,7 +349,7 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
             params: {
                 Limit: 24,
                 UserId: userId,
-                Fields: 'Overview,Path,MediaSources,UserData,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
+                Fields: 'Overview,Path,MediaSources,UserData,RunTimeTicks,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
                 DisableFirstEpisode: false,
             },
             headers: getHeaders(),
