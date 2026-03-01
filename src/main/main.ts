@@ -8,6 +8,12 @@ import * as playerService from './services/player'
 
 const isDev = process.env.NODE_ENV === 'development'
 
+// Linux GPU drivers can fail Chromium context creation in kiosk-like Electron apps.
+// Fall back to software rendering to keep app startup stable.
+if (process.platform === 'linux') {
+    app.disableHardwareAcceleration()
+}
+
 let mainWindow: BrowserWindow | null = null
 
 // Register custom protocol handler for local media files
