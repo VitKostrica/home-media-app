@@ -13,37 +13,37 @@ const HOME_TILES: AppTile[] = [
     {
         id: 'custom-media',
         title: 'Custom Media',
-        icon: '🎬',
+        icon: '/app-icons/jellyfin.png',
         description: 'Local movies & shows',
     },
     {
         id: 'youtube',
         title: 'YouTube',
-        icon: '▶️',
+        icon: '/app-icons/youtube.png',
         description: 'Online videos',
     },
     {
         id: 'disney-plus',
         title: 'Disney+',
-        icon: '✨',
+        icon: '/app-icons/disney.png',
         description: 'Disney content',
     },
     {
         id: 'prime-video',
         title: 'Prime Video',
-        icon: '🎯',
+        icon: '/app-icons/primevideo.png',
         description: 'Prime content',
     },
     {
         id: 'sweet-tv',
         title: 'Sweet.tv',
-        icon: '📺',
+        icon: '/app-icons/sweet.png',
         description: 'Sweet.tv service',
     },
     {
         id: 'jellyfin',
         title: 'Jellyfin',
-        icon: '🎥',
+        icon: '/app-icons/jellyfin.png',
         description: 'Personal media server',
     },
 ]
@@ -90,10 +90,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         const tile = HOME_TILES[index]
         console.log('Selected:', tile.id)
 
-        if (tile.id === 'custom-media' && onNavigate) {
+        if (!onNavigate) return
+
+        if (tile.id === 'custom-media') {
             onNavigate('media-app')
+            return
         }
-        // TODO: Handle other tiles (launch external apps)
+
+        const webAppIds = new Set(['youtube', 'disney-plus', 'prime-video', 'sweet-tv', 'jellyfin'])
+        if (webAppIds.has(tile.id)) {
+            onNavigate(`web:${tile.id}`)
+        }
     }
 
     const handleClose = () => {
@@ -101,11 +108,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         window.electron?.close()
     }
 
+    const handleRestart = () => {
+        console.log('Restarting app')
+        window.electron?.restart()
+    }
+
     return (
         <div className="home-screen">
             <div className="home-header">
                 <h1>Home Media Center</h1>
-                <button className="close-button" onClick={handleClose} title="Close">✕</button>
+                <div className="home-actions">
+                    <button className="restart-button" onClick={handleRestart} title="Restart">↻</button>
+                    <button className="close-button" onClick={handleClose} title="Close">✕</button>
+                </div>
             </div>
 
             <div className="tiles-grid">

@@ -51,6 +51,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true,
+            webviewTag: true,
         },
         show: false,
     })
@@ -119,6 +120,16 @@ ipcMain.handle('app:close', () => {
     if (mainWindow) {
         mainWindow.close()
     }
+})
+
+ipcMain.handle('app:restart', () => {
+    try {
+        playerService.stopPlayer()
+    } catch {
+        // Ignore player stop errors during restart
+    }
+    app.relaunch()
+    app.exit(0)
 })
 
 // ── Config IPC ───────────────────────────────────────────────
