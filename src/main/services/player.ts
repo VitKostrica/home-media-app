@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { BrowserWindow } from 'electron'
 import * as jellyfinService from './jellyfin'
 import path from 'path'
+import * as fs from 'fs'
 import net from 'net'
 
 type PlayerType = 'mpv' | 'vlc'
@@ -14,7 +15,7 @@ let playbackStartPositionSec = 0
 let currentDurationSec = 0
 let stopRequestedByUser = false
 let currentPlaySessionId = ''
-let currentVlcRcPort = 0
+let currentVlcSocketPath = ''
 let lastKnownPositionSec = 0
 
 function ticksToSec(ticks: number): number {
@@ -55,12 +56,8 @@ function getReportedStopPositionTicks(): number {
     return Math.min(estimatedTicks, maxForcedStopTicks)
 }
 
-function pickRcPort(): number {
-    return 30000 + Math.floor(Math.random() * 20000)
-}
-
-async function queryVlcTimeSec(port: number): Promise<number | null> {
-    if (!port) return null
+async function queryVlcTimeSec(socketPath: string): Promise<number | null> {
+    if (!socketPath) return null
 
     return new Promise((resolve) => {
         let settled = false
@@ -72,7 +69,7 @@ async function queryVlcTimeSec(port: number): Promise<number | null> {
             resolve(value)
         }
 
-        const socket = net.createConnection({ host: '127.0.0.1', port })
+        const socket = net.createConnection(socketPath)
 
         const guard = setTimeout(() => {
             socket.destroy()
@@ -91,7 +88,7 @@ async function queryVlcTimeSec(port: number): Promise<number | null> {
         })
 
         socket.on('error', (err) => {
-            console.warn(`[PlaybackDebug] VLC RC query connect failed on port=${port}: ${err?.message || err}`)
+            console.warn(`[PlaybackDebug] VLC RC query connect failed on socket=${socketPath}: ${err?.message || err}`)
             clearTimeout(guard)
             finish(null)
         })
@@ -115,13 +112,18 @@ async function queryVlcTimeSec(port: number): Promise<number | null> {
 }
 
 async function refreshVlcPositionIfPossible(): Promise<void> {
-    if (!currentVlcRcPort) return
-    const sec = await queryVlcTimeSec(currentVlcRcPort)
+    if (!currentVlcSocketPath) return
+    if (!fs.existsSync(currentVlcSocketPath)) {
+        console.log(`[PlaybackDebug] VLC RC socket not found yet: ${currentVlcSocketPath}`)
+        return
+    }
+
+    const sec = await queryVlcTimeSec(currentVlcSocketPath)
     if (typeof sec === 'number' && sec >= 0) {
         lastKnownPositionSec = sec
         console.log(`[PlaybackDebug] VLC reported current sec=${sec} via rc socket`)
     } else {
-        console.log(`[PlaybackDebug] VLC position query returned no data (port=${currentVlcRcPort})`)
+        console.log(`[PlaybackDebug] VLC position query returned no data (socket=${currentVlcSocketPath})`)
     }
 }
 
@@ -161,7 +163,7 @@ export function launchPlayer(
     currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
     currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     lastKnownPositionSec = startPosition && startPosition > 0 ? startPosition : 0
-    currentVlcRcPort = 0
+    currentVlcSocketPath = ''
     console.log(
         `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} playSessionId=${currentPlaySessionId} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
     )
@@ -179,14 +181,22 @@ export function launchPlayer(
         } else {
             // VLC - add maximized window options
             args = ['--fullscreen', '--quiet']
-            currentVlcRcPort = pickRcPort()
-            args.push('--extraintf=rc', '--rc-fake-tty', '--rc-quiet', `--rc-host=127.0.0.1:${currentVlcRcPort}`)
+            const socketName = `home-media-vlc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.sock`
+            currentVlcSocketPath = path.join('/tmp', socketName)
+            try {
+                if (fs.existsSync(currentVlcSocketPath)) {
+                    fs.unlinkSync(currentVlcSocketPath)
+                }
+            } catch {
+                // ignore stale socket cleanup failure
+            }
+            args.push('--extraintf=rc', '--rc-fake-tty', `--rc-unix=${currentVlcSocketPath}`)
             if (startPosition && startPosition > 0) {
                 args.push(`--start-time=${startPosition}`)
             }
             args.push(filePath)
             currentPlayer = spawn('vlc', args, { detached: true, stdio: 'ignore' })
-            console.log(`[PlaybackDebug] VLC RC TCP enabled on 127.0.0.1:${currentVlcRcPort}`)
+            console.log(`[PlaybackDebug] VLC RC unix socket enabled at ${currentVlcSocketPath}`)
         }
         const launchedPlayer = currentPlayer
 
@@ -257,7 +267,7 @@ export function launchPlayer(
             stopRequestedByUser = false
             currentDurationSec = 0
             currentPlaySessionId = ''
-            currentVlcRcPort = 0
+            currentVlcSocketPath = ''
             lastKnownPositionSec = 0
             // Restore Electron window if player failed to start
             if (mainWindow && mainWindow.isMinimized()) {
@@ -302,7 +312,7 @@ export function launchPlayer(
             currentDurationSec = 0
             stopRequestedByUser = false
             currentPlaySessionId = ''
-            currentVlcRcPort = 0
+            currentVlcSocketPath = ''
             lastKnownPositionSec = 0
         })
 
