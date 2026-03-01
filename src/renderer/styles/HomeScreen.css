@@ -10,9 +10,9 @@
 }
 
 .home-header {
-    padding: 18px 50px 10px;
-    border-bottom: 2px solid #0d2f63;
-    background: #123d82;
+    padding: 12px 50px;
+    border-bottom: 2px solid #071f42;
+    background: #0a2957;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -68,8 +68,8 @@
 .home-footer {
     padding: 12px 50px;
     text-align: center;
-    border-top: 2px solid #0d2f63;
-    background: #123d82;
+    border-top: 2px solid #071f42;
+    background: #0a2957;
     font-size: 1rem;
     opacity: 0.95;
 }
@@ -87,7 +87,7 @@
     }
 
     .home-header {
-        padding: 14px 40px 8px;
+        padding: 10px 40px;
     }
 
     .home-header h1 {
