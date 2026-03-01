@@ -128,14 +128,22 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     api.getResumeItems(),
                     api.getNextUpItems(),
                 ])
-                const seenIds = new Set<string>()
-                data = [...(resumeItems || []), ...(nextUpItems || [])]
-                    .filter((item) => {
-                        if (!item?.id || seenIds.has(item.id)) return false
-                        seenIds.add(item.id)
-                        return true
-                    })
-                    .slice(0, 24)
+                const resumeUnique = (resumeItems || []).filter((item) => item?.id)
+                const seenIds = new Set<string>(resumeUnique.map((item) => item.id))
+                const nextUpUnique = (nextUpItems || []).filter(
+                    (item) => item?.id && !seenIds.has(item.id)
+                )
+
+                // Keep room for Next Up so it is always visible on this tab.
+                const maxItems = 24
+                const minNextUpSlots = nextUpUnique.length > 0 ? Math.min(8, nextUpUnique.length) : 0
+                const resumeSlots = Math.min(resumeUnique.length, maxItems - minNextUpSlots)
+                const nextUpSlots = Math.min(nextUpUnique.length, maxItems - resumeSlots)
+
+                data = [
+                    ...resumeUnique.slice(0, resumeSlots),
+                    ...nextUpUnique.slice(0, nextUpSlots),
+                ]
             } else if (activeTab === 1) {
                 // Movies tab
                 data = await api.getMovies()
