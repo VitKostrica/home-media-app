@@ -2,6 +2,8 @@ import { spawn, ChildProcess } from 'child_process'
 import { BrowserWindow } from 'electron'
 import * as jellyfinService from './jellyfin'
 import path from 'path'
+import * as fs from 'fs'
+import net from 'net'
 
 type PlayerType = 'mpv' | 'vlc'
 
@@ -13,6 +15,8 @@ let playbackStartPositionSec = 0
 let currentDurationSec = 0
 let stopRequestedByUser = false
 let currentPlaySessionId = ''
+let currentVlcSocketPath = ''
+let lastKnownPositionSec = 0
 
 function ticksToSec(ticks: number): number {
     return Math.floor(ticks / 10000000)
@@ -33,8 +37,14 @@ function getEstimatedPositionTicks(): number {
     return (playbackStartPositionSec + elapsedSec) * 10000000
 }
 
+function getBestKnownPositionTicks(): number {
+    const estimatedSec = Math.floor(getEstimatedPositionTicks() / 10000000)
+    const bestSec = Math.max(estimatedSec, lastKnownPositionSec)
+    return bestSec * 10000000
+}
+
 function getReportedStopPositionTicks(): number {
-    const estimatedTicks = getEstimatedPositionTicks()
+    const estimatedTicks = getBestKnownPositionTicks()
     if (!stopRequestedByUser || currentDurationSec <= 0) {
         return estimatedTicks
     }
@@ -46,10 +56,75 @@ function getReportedStopPositionTicks(): number {
     return Math.min(estimatedTicks, maxForcedStopTicks)
 }
 
+async function queryVlcTimeSec(socketPath: string): Promise<number | null> {
+    if (!socketPath) return null
+    if (!fs.existsSync(socketPath)) return null
+
+    return new Promise((resolve) => {
+        let settled = false
+        let output = ''
+
+        const finish = (value: number | null) => {
+            if (settled) return
+            settled = true
+            resolve(value)
+        }
+
+        const socket = net.createConnection(socketPath)
+
+        const guard = setTimeout(() => {
+            socket.destroy()
+            finish(null)
+        }, 800)
+
+        socket.on('connect', () => {
+            socket.write('get_time\n')
+            setTimeout(() => {
+                socket.end()
+            }, 120)
+        })
+
+        socket.on('data', (chunk: Buffer) => {
+            output += chunk.toString('utf8')
+        })
+
+        socket.on('error', () => {
+            clearTimeout(guard)
+            finish(null)
+        })
+
+        socket.on('close', () => {
+            clearTimeout(guard)
+            const lines = output
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+            for (const line of lines.reverse()) {
+                if (/^\d+$/.test(line)) {
+                    const sec = parseInt(line, 10)
+                    finish(Number.isFinite(sec) ? sec : null)
+                    return
+                }
+            }
+            finish(null)
+        })
+    })
+}
+
+async function refreshVlcPositionIfPossible(): Promise<void> {
+    if (!currentVlcSocketPath) return
+    const sec = await queryVlcTimeSec(currentVlcSocketPath)
+    if (typeof sec === 'number' && sec >= 0) {
+        lastKnownPositionSec = sec
+        console.log(`[PlaybackDebug] VLC reported current sec=${sec} via rc socket`)
+    }
+}
+
 function startProgressReporting(itemId: string) {
     clearProgressInterval()
-    progressInterval = setInterval(() => {
-        const ticks = getEstimatedPositionTicks()
+    progressInterval = setInterval(async () => {
+        await refreshVlcPositionIfPossible()
+        const ticks = getBestKnownPositionTicks()
         console.log(`[PlaybackDebug] Progress tick item=${itemId} sec=${ticksToSec(ticks)} ticks=${ticks}`)
         jellyfinService.reportProgress(itemId, ticks, currentPlaySessionId).catch((err) => {
             console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
@@ -80,6 +155,8 @@ export function launchPlayer(
     stopRequestedByUser = false
     currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
     currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    lastKnownPositionSec = startPosition && startPosition > 0 ? startPosition : 0
+    currentVlcSocketPath = ''
     console.log(
         `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} playSessionId=${currentPlaySessionId} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
     )
@@ -97,6 +174,16 @@ export function launchPlayer(
         } else {
             // VLC - add maximized window options
             args = ['--fullscreen', '--quiet']
+            const socketName = `home-media-vlc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.sock`
+            currentVlcSocketPath = path.join('/tmp', socketName)
+            try {
+                if (fs.existsSync(currentVlcSocketPath)) {
+                    fs.unlinkSync(currentVlcSocketPath)
+                }
+            } catch {
+                // ignore stale socket cleanup failure
+            }
+            args.push('--extraintf=rc', '--rc-fake-tty', `--rc-unix=${currentVlcSocketPath}`)
             if (startPosition && startPosition > 0) {
                 args.push(`--start-time=${startPosition}`)
             }
@@ -172,6 +259,8 @@ export function launchPlayer(
             stopRequestedByUser = false
             currentDurationSec = 0
             currentPlaySessionId = ''
+            currentVlcSocketPath = ''
+            lastKnownPositionSec = 0
             // Restore Electron window if player failed to start
             if (mainWindow && mainWindow.isMinimized()) {
                 mainWindow.restore()
@@ -187,10 +276,10 @@ export function launchPlayer(
 
             // Report playback stopped to Jellyfin
             if (currentItemId) {
-                const estimatedTicks = getEstimatedPositionTicks()
+                const estimatedTicks = getBestKnownPositionTicks()
                 const positionTicks = getReportedStopPositionTicks()
                 console.log(
-                    `[PlaybackDebug] reportStopped item=${currentItemId} code=${code} stopRequested=${stopRequestedByUser} startSec=${playbackStartPositionSec} estimatedSec=${ticksToSec(estimatedTicks)} reportedSec=${ticksToSec(positionTicks)} durationSec=${currentDurationSec || 0}`
+                    `[PlaybackDebug] reportStopped item=${currentItemId} code=${code} stopRequested=${stopRequestedByUser} startSec=${playbackStartPositionSec} lastKnownSec=${lastKnownPositionSec} estimatedSec=${ticksToSec(estimatedTicks)} reportedSec=${ticksToSec(positionTicks)} durationSec=${currentDurationSec || 0}`
                 )
                 jellyfinService.reportStopped(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
                     console.error('[PlaybackDebug] reportStopped failed:', err?.message || err)
@@ -215,6 +304,8 @@ export function launchPlayer(
             currentDurationSec = 0
             stopRequestedByUser = false
             currentPlaySessionId = ''
+            currentVlcSocketPath = ''
+            lastKnownPositionSec = 0
         })
 
         // Unref so the player doesn't prevent Electron from closing
@@ -233,6 +324,10 @@ export function stopPlayer(): void {
         console.log(
             `[PlaybackDebug] stopPlayer called item=${currentItemId || 'none'} startSec=${playbackStartPositionSec} durationSec=${currentDurationSec || 0}`
         )
-        currentPlayer.kill()
+        refreshVlcPositionIfPossible()
+            .catch(() => { })
+            .finally(() => {
+                currentPlayer?.kill()
+            })
     }
 }
