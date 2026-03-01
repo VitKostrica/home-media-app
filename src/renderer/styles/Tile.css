@@ -8,8 +8,8 @@
     justify-content: center;
     gap: 15px;
     padding: 30px 20px;
-    background: #1565c0;
-    border: 2px solid #0d47a1;
+    background: #123d82;
+    border: 2px solid #0d2f63;
     border-radius: 16px;
     cursor: pointer;
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -31,8 +31,8 @@
 }
 
 .tile:hover {
-    background: #1976d2;
-    border-color: #1565c0;
+    background: #184892;
+    border-color: #123d82;
     transform: translateY(-4px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
@@ -42,8 +42,8 @@
 }
 
 .tile.focused {
-    background: #1e88e5;
-    border-color: #64b5f6;
+    background: #1d4f9d;
+    border-color: #3f79c8;
     transform: scale(1.08);
     box-shadow: 0 0 30px rgba(66, 165, 245, 0.4), inset 0 0 20px rgba(66, 165, 245, 0.1);
 }
