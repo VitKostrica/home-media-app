@@ -105,6 +105,14 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         setLoading(true)
         setError(null)
         try {
+            const config = await window.electron?.configApi?.get()
+            if (!config?.jellyfinApiKey || !config?.jellyfinUserId) {
+                setIsAuthenticated(false)
+                setItems([])
+                setLoading(false)
+                return
+            }
+
             const api = window.electron?.jellyfinApi
             if (!api) {
                 setError('Electron API not available')

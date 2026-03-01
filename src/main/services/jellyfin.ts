@@ -80,9 +80,27 @@ function getHeaders(): Record<string, string> {
         'X-Emby-Authorization': CLIENT_INFO,
     }
     if (accessToken) {
+        headers['X-Emby-Authorization'] = `${CLIENT_INFO}, Token="${accessToken}"`
         headers['X-Emby-Token'] = accessToken
+        headers['X-MediaBrowser-Token'] = accessToken
     }
     return headers
+}
+
+function clearAuth(): void {
+    accessToken = ''
+    userId = ''
+    setConfig({
+        jellyfinApiKey: '',
+        jellyfinUserId: '',
+    })
+}
+
+function handleAuthError(err: any): void {
+    if (err?.response?.status === 401) {
+        console.warn('Jellyfin returned 401, clearing saved auth.')
+        clearAuth()
+    }
 }
 
 /** Restore credentials from saved config */
@@ -188,6 +206,7 @@ export async function getMovies(): Promise<MappedItem[]> {
         })
         return (response.data.Items || []).map(mapItem)
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to fetch movies:', err)
         return []
     }
@@ -210,6 +229,7 @@ export async function getSeries(): Promise<MappedItem[]> {
         })
         return (response.data.Items || []).map(mapItem)
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to fetch series:', err)
         return []
     }
@@ -229,6 +249,7 @@ export async function getSeasons(seriesId: string): Promise<MappedItem[]> {
         })
         return (response.data.Items || []).map(mapItem)
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to fetch seasons:', err)
         return []
     }
@@ -252,6 +273,7 @@ export async function getEpisodes(
         })
         return (response.data.Items || []).map(mapItem)
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to fetch episodes:', err)
         return []
     }
@@ -275,6 +297,7 @@ export async function getResumeItems(): Promise<MappedItem[]> {
         })
         return (response.data.Items || []).map(mapItem)
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to fetch resume items:', err)
         return []
     }
@@ -303,6 +326,7 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
         })
         return (response.data.Items || []).map(mapItem)
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to fetch next up items:', err)
         return []
     }
@@ -411,6 +435,7 @@ export async function reportPlaybackStart(itemId: string, positionTicks: number 
             { headers: getHeaders() }
         )
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to report playback start:', err)
     }
 }
@@ -431,6 +456,7 @@ export async function reportProgress(itemId: string, positionTicks: number): Pro
             { headers: getHeaders() }
         )
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to report progress:', err)
     }
 }
@@ -450,6 +476,7 @@ export async function reportStopped(itemId: string, positionTicks: number): Prom
             { headers: getHeaders() }
         )
     } catch (err) {
+        handleAuthError(err)
         console.error('Failed to report playback stopped:', err)
     }
 }
