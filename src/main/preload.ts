@@ -4,8 +4,8 @@ contextBridge.exposeInMainWorld('electron', {
     close: () => ipcRenderer.invoke('app:close'),
 
     playerApi: {
-        launch: (player: string, filePath: string, startPosition?: number, jellyfinItemId?: string) =>
-            ipcRenderer.invoke('player:launch', player, filePath, startPosition, jellyfinItemId),
+        launch: (player: string, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) =>
+            ipcRenderer.invoke('player:launch', player, filePath, startPosition, jellyfinItemId, durationSec),
         play: () => ipcRenderer.invoke('player:play'),
         pause: () => ipcRenderer.invoke('player:pause'),
         stop: () => ipcRenderer.invoke('player:stop'),

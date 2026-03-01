@@ -9,6 +9,8 @@ let currentItemId: string | null = null
 let progressInterval: NodeJS.Timeout | null = null
 let playbackStartedAtMs = 0
 let playbackStartPositionSec = 0
+let currentDurationSec = 0
+let stopRequestedByUser = false
 
 function clearProgressInterval() {
     if (progressInterval) {
@@ -23,6 +25,19 @@ function getEstimatedPositionTicks(): number {
     }
     const elapsedSec = Math.max(0, Math.floor((Date.now() - playbackStartedAtMs) / 1000))
     return (playbackStartPositionSec + elapsedSec) * 10000000
+}
+
+function getReportedStopPositionTicks(): number {
+    const estimatedTicks = getEstimatedPositionTicks()
+    if (!stopRequestedByUser || currentDurationSec <= 0) {
+        return estimatedTicks
+    }
+
+    // When user force-stops VLC (Backspace), avoid accidental "fully watched"
+    // due to estimate drift; keep reported stop safely below completion.
+    const durationTicks = currentDurationSec * 10000000
+    const maxForcedStopTicks = Math.floor(durationTicks * 0.9)
+    return Math.min(estimatedTicks, maxForcedStopTicks)
 }
 
 function startProgressReporting(itemId: string) {
@@ -41,7 +56,8 @@ export function launchPlayer(
     filePath: string,
     startPosition?: number,
     jellyfinItemId?: string,
-    mainWindow?: BrowserWindow
+    mainWindow?: BrowserWindow,
+    durationSec?: number
 ): { success: boolean; error?: string } {
     // Kill existing player if running
     if (currentPlayer && !currentPlayer.killed) {
@@ -51,6 +67,8 @@ export function launchPlayer(
     }
 
     currentItemId = jellyfinItemId || null
+    stopRequestedByUser = false
+    currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
 
     try {
         let args: string[]
@@ -130,6 +148,8 @@ export function launchPlayer(
             console.error(`Failed to launch ${type}:`, err.message)
             clearProgressInterval()
             currentPlayer = null
+            stopRequestedByUser = false
+            currentDurationSec = 0
             // Restore Electron window if player failed to start
             if (mainWindow && mainWindow.isMinimized()) {
                 mainWindow.restore()
@@ -145,7 +165,7 @@ export function launchPlayer(
 
             // Report playback stopped to Jellyfin
             if (currentItemId) {
-                const positionTicks = getEstimatedPositionTicks()
+                const positionTicks = getReportedStopPositionTicks()
                 jellyfinService.reportStopped(currentItemId, positionTicks).catch(() => { })
             }
 
@@ -162,6 +182,8 @@ export function launchPlayer(
             currentItemId = null
             playbackStartedAtMs = 0
             playbackStartPositionSec = 0
+            currentDurationSec = 0
+            stopRequestedByUser = false
         })
 
         // Unref so the player doesn't prevent Electron from closing
@@ -176,6 +198,7 @@ export function launchPlayer(
 /** Kill the current player process if running */
 export function stopPlayer(): void {
     if (currentPlayer && !currentPlayer.killed) {
+        stopRequestedByUser = true
         currentPlayer.kill()
     }
 }

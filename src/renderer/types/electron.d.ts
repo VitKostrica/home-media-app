@@ -3,7 +3,7 @@ declare global {
         electron: {
             close: () => void
             playerApi: {
-                launch: (player: string, filePath: string, startPosition?: number, jellyfinItemId?: string) => Promise<void>
+                launch: (player: string, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) => Promise<void>
                 play: () => Promise<void>
                 pause: () => Promise<void>
                 stop: () => Promise<void>

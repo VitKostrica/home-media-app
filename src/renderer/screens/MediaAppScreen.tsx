@@ -223,7 +223,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     'vlc',
                     item.filePath,
                     startPosition,
-                    item.id
+                    item.id,
+                    item.duration
                 )
 
                 console.log('VLC launch result:', result)
@@ -260,7 +261,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     'vlc',
                     selectedItem.filePath,
                     startPosition,
-                    selectedItem.id
+                    selectedItem.id,
+                    selectedItem.duration
                 )
 
                 if (result?.success) {

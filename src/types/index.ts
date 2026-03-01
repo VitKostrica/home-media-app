@@ -62,7 +62,7 @@ export interface AppConfig {
 export interface ElectronAPI {
     close: () => Promise<void>
     playerApi: {
-        launch: (player: PlayerType, filePath: string, startPosition?: number) => Promise<{ success: boolean; error?: string }>
+        launch: (player: PlayerType, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) => Promise<{ success: boolean; error?: string }>
         play: () => Promise<void>
         pause: () => Promise<void>
         stop: () => Promise<void>
