@@ -18,6 +18,7 @@ declare global {
                 getSeasons: (seriesId: string) => Promise<any>
                 getEpisodes: (seriesId: string, seasonId: string) => Promise<any>
                 getResumeItems: () => Promise<any>
+                getNextUpItems: () => Promise<any>
                 getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
                 reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
                 reportProgress: (itemId: string, positionTicks: number) => Promise<void>

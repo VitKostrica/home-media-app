@@ -6,6 +6,31 @@ type PlayerType = 'mpv' | 'vlc'
 
 let currentPlayer: ChildProcess | null = null
 let currentItemId: string | null = null
+let progressInterval: NodeJS.Timeout | null = null
+let playbackStartedAtMs = 0
+let playbackStartPositionSec = 0
+
+function clearProgressInterval() {
+    if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+    }
+}
+
+function getEstimatedPositionTicks(): number {
+    if (!playbackStartedAtMs) {
+        return playbackStartPositionSec * 10000000
+    }
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - playbackStartedAtMs) / 1000))
+    return (playbackStartPositionSec + elapsedSec) * 10000000
+}
+
+function startProgressReporting(itemId: string) {
+    clearProgressInterval()
+    progressInterval = setInterval(() => {
+        jellyfinService.reportProgress(itemId, getEstimatedPositionTicks()).catch(() => { })
+    }, 10000)
+}
 
 /**
  * Launch MPV or VLC with a media file.
@@ -20,6 +45,7 @@ export function launchPlayer(
 ): { success: boolean; error?: string } {
     // Kill existing player if running
     if (currentPlayer && !currentPlayer.killed) {
+        clearProgressInterval()
         currentPlayer.kill()
         currentPlayer = null
     }
@@ -45,6 +71,7 @@ export function launchPlayer(
             args.push(filePath)
             currentPlayer = spawn('vlc', args, { detached: true, stdio: 'ignore' })
         }
+        const launchedPlayer = currentPlayer
 
         // Push VLC window to the front on Linux
         if (mainWindow && process.platform === 'linux') {
@@ -90,13 +117,18 @@ export function launchPlayer(
         }
 
         // Report playback start to Jellyfin
+        playbackStartPositionSec = startPosition && startPosition > 0 ? startPosition : 0
+        playbackStartedAtMs = Date.now()
         if (currentItemId) {
-            const positionTicks = (startPosition || 0) * 10000000
+            const positionTicks = playbackStartPositionSec * 10000000
             jellyfinService.reportPlaybackStart(currentItemId, positionTicks).catch(() => { })
+            startProgressReporting(currentItemId)
         }
 
         currentPlayer.on('error', (err) => {
+            if (currentPlayer !== launchedPlayer) return
             console.error(`Failed to launch ${type}:`, err.message)
+            clearProgressInterval()
             currentPlayer = null
             // Restore Electron window if player failed to start
             if (mainWindow && mainWindow.isMinimized()) {
@@ -107,13 +139,13 @@ export function launchPlayer(
         })
 
         currentPlayer.on('exit', (code) => {
+            if (currentPlayer !== launchedPlayer) return
             console.log(`${type} exited with code ${code}`)
+            clearProgressInterval()
 
             // Report playback stopped to Jellyfin
-            // Note: Without player IPC, we can't know the exact final position.
-            // For now, report the start position. Real tracking via MPV IPC comes later.
             if (currentItemId) {
-                const positionTicks = (startPosition || 0) * 10000000
+                const positionTicks = getEstimatedPositionTicks()
                 jellyfinService.reportStopped(currentItemId, positionTicks).catch(() => { })
             }
 
@@ -128,6 +160,8 @@ export function launchPlayer(
 
             currentPlayer = null
             currentItemId = null
+            playbackStartedAtMs = 0
+            playbackStartPositionSec = 0
         })
 
         // Unref so the player doesn't prevent Electron from closing
@@ -143,7 +177,5 @@ export function launchPlayer(
 export function stopPlayer(): void {
     if (currentPlayer && !currentPlayer.killed) {
         currentPlayer.kill()
-        currentPlayer = null
-        currentItemId = null
     }
 }

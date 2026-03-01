@@ -51,7 +51,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [vlcPlayingItem, setVlcPlayingItem] = useState<MediaItem | null>(null)
     const [showPlayerSelect, setShowPlayerSelect] = useState<MediaItem | null>(null)
     const [selectedPlayerType, setSelectedPlayerType] = useState<'html5' | 'vlc'>('html5')
-    const [itemsCache, setItemsCache] = useState<{ [key: number]: MediaItem[] }>({})
 
     const gridRef = useRef<HTMLDivElement>(null)
 
@@ -103,14 +102,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }
 
     const fetchItems = async () => {
-        // Check cache first
-        if (itemsCache[activeTab]) {
-            setItems(itemsCache[activeTab])
-            setLoading(false)
-            setGridIndex(0)
-            return
-        }
-
         setLoading(true)
         setError(null)
         try {
@@ -124,17 +115,19 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             let data: MediaItem[] = []
 
             if (activeTab === 0) {
-                // Continue Watching tab - use dedicated endpoint
-                const resumeItems = await api.getResumeItems()
-                console.log('Resume items count:', resumeItems?.length || 0)
-                if (resumeItems && resumeItems.length > 0) {
-                    console.log('Sample resume items:', resumeItems.slice(0, 3).map(i => ({
-                        title: i.title,
-                        type: i.type,
-                        playedPercentage: i.playedPercentage,
-                    })))
-                }
-                data = (resumeItems || []).slice(0, 24)
+                // Continue Watching tab: refresh Resume + Next Up each visit
+                const [resumeItems, nextUpItems] = await Promise.all([
+                    api.getResumeItems(),
+                    api.getNextUpItems(),
+                ])
+                const seenIds = new Set<string>()
+                data = [...(resumeItems || []), ...(nextUpItems || [])]
+                    .filter((item) => {
+                        if (!item?.id || seenIds.has(item.id)) return false
+                        seenIds.add(item.id)
+                        return true
+                    })
+                    .slice(0, 24)
             } else if (activeTab === 1) {
                 // Movies tab
                 data = await api.getMovies()
@@ -143,8 +136,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 data = await api.getSeries()
             }
 
-            // Cache the results
-            setItemsCache(prev => ({ ...prev, [activeTab]: data }))
             setItems(data || [])
             setGridIndex(0)
         } catch (err: unknown) {
@@ -226,9 +217,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 setShowDetail(false)
             } else if (playerType === 'vlc') {
                 // Launch VLC as fullscreen overlay
-                const startPosition = selectedItem.resumePosition
-                    ? Math.floor(selectedItem.resumePosition / 10000000)
-                    : 0
+                const startPosition = selectedItem.resumePosition || 0
 
                 const result = await window.electron?.playerApi?.launch(
                     'vlc',
@@ -397,6 +386,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         if (tabIndex !== activeTab) {
             setActiveTab(tabIndex)
             setGridIndex(0)
+        } else if (tabIndex === 0) {
+            fetchItems()
         }
     }
 
@@ -420,11 +411,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         return (
             <VideoPlayer
                 filePath={playingItem.filePath || ''}
-                startPosition={
-                    playingItem.resumePosition
-                        ? Math.floor(playingItem.resumePosition / 10000000)
-                        : 0
-                }
+                startPosition={playingItem.resumePosition || 0}
                 jellyfinItemId={playingItem.id}
                 onClose={() => setPlayingItem(null)}
                 onProgress={handlePlayerProgress}

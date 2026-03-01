@@ -76,6 +76,8 @@ export interface ElectronAPI {
         getSeries: () => Promise<MediaItem[]>
         getSeasons: (seriesId: string) => Promise<MediaItem[]>
         getEpisodes: (seriesId: string, seasonId: string) => Promise<MediaItem[]>
+        getResumeItems: () => Promise<MediaItem[]>
+        getNextUpItems: () => Promise<MediaItem[]>
         reportProgress: (itemId: string, positionTicks: number) => Promise<void>
         reportStopped: (itemId: string, positionTicks: number) => Promise<void>
     }

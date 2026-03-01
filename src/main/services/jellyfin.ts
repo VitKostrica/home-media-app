@@ -280,6 +280,34 @@ export async function getResumeItems(): Promise<MappedItem[]> {
     }
 }
 
+/** Get Next Up episodes for Continue Watching */
+export async function getNextUpItems(): Promise<MappedItem[]> {
+    if (!ensureAuth()) return []
+
+    try {
+        const api = getClient()
+        const response = await api.get('/Shows/NextUp', {
+            params: {
+                Limit: 24,
+                Fields: 'PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount,UserData',
+                UserId: userId,
+                ImageTypeLimit: 1,
+                EnableImageTypes: 'Primary,Backdrop,Banner,Thumb',
+                EnableTotalRecordCount: false,
+                DisableFirstEpisode: false,
+                NextUpDateCutoff: new Date().toISOString(),
+                EnableResumable: false,
+                EnableRewatching: false,
+            },
+            headers: getHeaders(),
+        })
+        return (response.data.Items || []).map(mapItem)
+    } catch (err) {
+        console.error('Failed to fetch next up items:', err)
+        return []
+    }
+}
+
 /** Get playback info for an item (gets the stream URL) */
 export async function getPlaybackInfo(
     itemId: string
