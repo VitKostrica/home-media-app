@@ -17,6 +17,10 @@ interface JellyfinItem {
         PlayedPercentage?: number
     }
     Path?: string
+    SeriesId?: string
+    SeriesPrimaryImageTag?: string
+    ParentThumbItemId?: string
+    ParentThumbImageTag?: string
     SeriesName?: string
     SeasonName?: string
     IndexNumber?: number
@@ -120,16 +124,26 @@ function mapItem(item: JellyfinItem): MappedItem {
     const config = getConfig()
     const token = accessToken || config.jellyfinApiKey
     const filePath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
+    const itemType = item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode'
 
     // Always use Jellyfin for poster images
-    const posterUrl = item.ImageTags?.Primary
+    let posterUrl = item.ImageTags?.Primary
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
+
+    // For episodes, prefer series poster so cards match Movies/Shows visual style.
+    if (itemType === 'episode') {
+        if (item.SeriesId && item.SeriesPrimaryImageTag) {
+            posterUrl = `${config.jellyfinUrl}/Items/${item.SeriesId}/Images/Primary?tag=${item.SeriesPrimaryImageTag}${token ? `&api_key=${token}` : ''}`
+        } else if (item.ParentThumbItemId && item.ParentThumbImageTag) {
+            posterUrl = `${config.jellyfinUrl}/Items/${item.ParentThumbItemId}/Images/Primary?tag=${item.ParentThumbImageTag}${token ? `&api_key=${token}` : ''}`
+        }
+    }
 
     return {
         id: item.Id,
         title: item.Name,
-        type: item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode',
+        type: itemType,
         year: item.ProductionYear,
         posterUrl,
         backdropUrl: item.BackdropImageTags?.length
@@ -289,7 +303,7 @@ export async function getResumeItems(): Promise<MappedItem[]> {
             params: {
                 Limit: 50,
                 Recursive: true,
-                Fields: 'Overview,Path,MediaSources,UserData',
+                Fields: 'Overview,Path,MediaSources,UserData,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
                 SortBy: 'DatePlayed',
                 SortOrder: 'Descending',
             },
@@ -312,7 +326,7 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
         const response = await api.get('/Shows/NextUp', {
             params: {
                 Limit: 24,
-                Fields: 'PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount,UserData',
+                Fields: 'PrimaryImageAspectRatio,DateCreated,Path,MediaSourceCount,UserData,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
                 UserId: userId,
                 ImageTypeLimit: 1,
                 EnableImageTypes: 'Primary,Backdrop,Banner,Thumb',
@@ -335,7 +349,7 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
             params: {
                 Limit: 24,
                 UserId: userId,
-                Fields: 'Overview,Path,MediaSources,UserData',
+                Fields: 'Overview,Path,MediaSources,UserData,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
                 DisableFirstEpisode: false,
             },
             headers: getHeaders(),
