@@ -10,7 +10,7 @@
 }
 
 .home-header {
-    padding: 12px 50px;
+    padding: 10px 50px;
     border-bottom: 2px solid #071f42;
     background: #0a2957;
     display: flex;
@@ -19,7 +19,9 @@
 }
 
 .home-header h1 {
-    font-size: 2.5rem;
+    font-size: 1.4rem;
+    height: 25px;
+    line-height: 25px;
     margin: 0;
     font-weight: 300;
     letter-spacing: 0.05em;
@@ -37,9 +39,12 @@
     background: none;
     border: none;
     color: #fff;
-    font-size: 1.4rem;
+    font-size: 1rem;
     cursor: pointer;
-    padding: 10px 18px;
+    width: 25px;
+    height: 25px;
+    line-height: 25px;
+    padding: 0;
     transition: all 0.3s ease;
 }
 
@@ -66,7 +71,7 @@
 }
 
 .home-footer {
-    padding: 12px 50px;
+    padding: 10px 50px;
     text-align: center;
     border-top: 2px solid #071f42;
     background: #0a2957;
@@ -75,6 +80,8 @@
 }
 
 .home-footer p {
+    height: 25px;
+    line-height: 25px;
     margin: 0;
 }
 
