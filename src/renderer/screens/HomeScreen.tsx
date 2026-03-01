@@ -90,10 +90,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         const tile = HOME_TILES[index]
         console.log('Selected:', tile.id)
 
-        if (tile.id === 'custom-media' && onNavigate) {
+        if (!onNavigate) return
+
+        if (tile.id === 'custom-media') {
             onNavigate('media-app')
+            return
         }
-        // TODO: Handle other tiles (launch external apps)
+
+        const webAppIds = new Set(['youtube', 'disney-plus', 'prime-video', 'sweet-tv', 'jellyfin'])
+        if (webAppIds.has(tile.id)) {
+            onNavigate(`web:${tile.id}`)
+        }
     }
 
     const handleClose = () => {

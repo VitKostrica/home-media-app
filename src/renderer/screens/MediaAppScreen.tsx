@@ -461,7 +461,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             {/* Header */}
             <div className="media-app-header">
                 <button className="back-button" onClick={() => onNavigate('home')}>
-                    ← Back
+                    ← Home
                 </button>
                 <h1 className="media-app-title">Custom Media</h1>
                 <div className="header-spacer" />
