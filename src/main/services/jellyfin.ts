@@ -453,7 +453,7 @@ export async function getPlaybackInfo(
 }
 
 /** Tell Jellyfin playback has started */
-export async function reportPlaybackStart(itemId: string, positionTicks: number = 0): Promise<void> {
+export async function reportPlaybackStart(itemId: string, positionTicks: number = 0, playSessionId?: string): Promise<void> {
     if (!ensureAuth()) return
 
     try {
@@ -461,12 +461,14 @@ export async function reportPlaybackStart(itemId: string, positionTicks: number 
         console.log(
             `[JellyfinPlayback] -> Playing item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
         )
+        const normalizedItemId = idToGuid(itemId)
         await api.post(
             '/Sessions/Playing',
             {
-                ItemId: itemId,
+                ItemId: normalizedItemId,
                 PositionTicks: positionTicks,
                 PlayMethod: 'DirectPlay',
+                ...(playSessionId ? { PlaySessionId: playSessionId } : {}),
             },
             { headers: getHeaders() }
         )
@@ -481,7 +483,7 @@ export async function reportPlaybackStart(itemId: string, positionTicks: number 
 }
 
 /** Update Jellyfin with current playback position */
-export async function reportProgress(itemId: string, positionTicks: number): Promise<void> {
+export async function reportProgress(itemId: string, positionTicks: number, playSessionId?: string): Promise<void> {
     if (!ensureAuth()) return
 
     try {
@@ -489,12 +491,14 @@ export async function reportProgress(itemId: string, positionTicks: number): Pro
         console.log(
             `[JellyfinPlayback] -> Progress item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
         )
+        const normalizedItemId = idToGuid(itemId)
         await api.post(
             '/Sessions/Playing/Progress',
             {
-                ItemId: itemId,
+                ItemId: normalizedItemId,
                 PositionTicks: positionTicks,
                 IsPaused: false,
+                ...(playSessionId ? { PlaySessionId: playSessionId } : {}),
             },
             { headers: getHeaders() }
         )
@@ -509,7 +513,7 @@ export async function reportProgress(itemId: string, positionTicks: number): Pro
 }
 
 /** Tell Jellyfin playback has stopped */
-export async function reportStopped(itemId: string, positionTicks: number): Promise<void> {
+export async function reportStopped(itemId: string, positionTicks: number, playSessionId?: string): Promise<void> {
     if (!ensureAuth()) return
 
     try {
@@ -517,11 +521,21 @@ export async function reportStopped(itemId: string, positionTicks: number): Prom
         console.log(
             `[JellyfinPlayback] -> Stopped item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
         )
+        const normalizedItemId = idToGuid(itemId)
         await api.post(
             '/Sessions/Playing/Stopped',
             {
-                ItemId: itemId,
+                ItemId: normalizedItemId,
                 PositionTicks: positionTicks,
+                ...(playSessionId ? { PlaySessionId: playSessionId } : {}),
+            },
+            { headers: getHeaders() }
+        )
+        // Fallback persistence for resume position if session-based tracking is ignored by server.
+        await api.post(
+            `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+            {
+                PlaybackPositionTicks: positionTicks,
             },
             { headers: getHeaders() }
         )

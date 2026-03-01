@@ -12,6 +12,7 @@ let playbackStartedAtMs = 0
 let playbackStartPositionSec = 0
 let currentDurationSec = 0
 let stopRequestedByUser = false
+let currentPlaySessionId = ''
 
 function ticksToSec(ticks: number): number {
     return Math.floor(ticks / 10000000)
@@ -50,7 +51,7 @@ function startProgressReporting(itemId: string) {
     progressInterval = setInterval(() => {
         const ticks = getEstimatedPositionTicks()
         console.log(`[PlaybackDebug] Progress tick item=${itemId} sec=${ticksToSec(ticks)} ticks=${ticks}`)
-        jellyfinService.reportProgress(itemId, ticks).catch((err) => {
+        jellyfinService.reportProgress(itemId, ticks, currentPlaySessionId).catch((err) => {
             console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
         })
     }, 10000)
@@ -78,8 +79,9 @@ export function launchPlayer(
     currentItemId = jellyfinItemId || null
     stopRequestedByUser = false
     currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
+    currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     console.log(
-        `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
+        `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} playSessionId=${currentPlaySessionId} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
     )
 
     try {
@@ -154,7 +156,7 @@ export function launchPlayer(
             console.log(
                 `[PlaybackDebug] reportPlaybackStart item=${currentItemId} sec=${playbackStartPositionSec} ticks=${positionTicks}`
             )
-            jellyfinService.reportPlaybackStart(currentItemId, positionTicks).catch((err) => {
+            jellyfinService.reportPlaybackStart(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
                 console.error('[PlaybackDebug] reportPlaybackStart failed:', err?.message || err)
             })
             startProgressReporting(currentItemId)
@@ -169,6 +171,7 @@ export function launchPlayer(
             currentPlayer = null
             stopRequestedByUser = false
             currentDurationSec = 0
+            currentPlaySessionId = ''
             // Restore Electron window if player failed to start
             if (mainWindow && mainWindow.isMinimized()) {
                 mainWindow.restore()
@@ -189,7 +192,7 @@ export function launchPlayer(
                 console.log(
                     `[PlaybackDebug] reportStopped item=${currentItemId} code=${code} stopRequested=${stopRequestedByUser} startSec=${playbackStartPositionSec} estimatedSec=${ticksToSec(estimatedTicks)} reportedSec=${ticksToSec(positionTicks)} durationSec=${currentDurationSec || 0}`
                 )
-                jellyfinService.reportStopped(currentItemId, positionTicks).catch((err) => {
+                jellyfinService.reportStopped(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
                     console.error('[PlaybackDebug] reportStopped failed:', err?.message || err)
                 })
             } else {
@@ -211,6 +214,7 @@ export function launchPlayer(
             playbackStartPositionSec = 0
             currentDurationSec = 0
             stopRequestedByUser = false
+            currentPlaySessionId = ''
         })
 
         // Unref so the player doesn't prevent Electron from closing
