@@ -17,6 +17,9 @@ interface MediaItem {
     resumePosition?: number
     playedPercentage?: number
     filePath?: string
+    seriesName?: string
+    seasonNumber?: number
+    episodeNumber?: number
 }
 
 interface MediaAppScreenProps {
@@ -51,6 +54,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [vlcPlayingItem, setVlcPlayingItem] = useState<MediaItem | null>(null)
     const [showPlayerSelect, setShowPlayerSelect] = useState<MediaItem | null>(null)
     const [selectedPlayerType, setSelectedPlayerType] = useState<'html5' | 'vlc'>('html5')
+    const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
+    const [nextUpItems, setNextUpItems] = useState<MediaItem[]>([])
 
     const gridRef = useRef<HTMLDivElement>(null)
 
@@ -146,16 +151,22 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 const resumeSlots = Math.min(resumeUnique.length, maxItems - minNextUpSlots)
                 const nextUpSlots = Math.min(nextUpUnique.length, maxItems - resumeSlots)
 
-                data = [
-                    ...resumeUnique.slice(0, resumeSlots),
-                    ...nextUpUnique.slice(0, nextUpSlots),
-                ]
+                const continueRow = resumeUnique.slice(0, resumeSlots)
+                const nextUpRow = nextUpUnique.slice(0, nextUpSlots)
+
+                setContinueWatchingItems(continueRow)
+                setNextUpItems(nextUpRow)
+                data = [...continueRow, ...nextUpRow]
             } else if (activeTab === 1) {
                 // Movies tab
                 data = await api.getMovies()
+                setContinueWatchingItems([])
+                setNextUpItems([])
             } else {
                 // Shows tab
                 data = await api.getSeries()
+                setContinueWatchingItems([])
+                setNextUpItems([])
             }
 
             setItems(data || [])
@@ -168,10 +179,14 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         }
     }
 
-    const handlePlayClick = (item: MediaItem) => {
+    const openItem = (item: MediaItem) => {
         setSelectedItem(item)
-        setShowPlayerSelect(item)
-        setPlayerBtnIndex(0)
+        if (item.type === 'series') {
+            setShowShowDetail(true)
+        } else {
+            setShowDetail(true)
+            setPlayerBtnIndex(0)
+        }
     }
 
     const playWithPlayer = useCallback(async (item: MediaItem, playerType: 'html5' | 'vlc') => {
@@ -378,9 +393,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 case 'Enter':
                 case ' ':
                     if (items[gridIndex]) {
-                        setSelectedItem(items[gridIndex])
-                        setShowDetail(true)
-                        setPlayerBtnIndex(0)
+                        openItem(items[gridIndex])
                     }
                     break
                 case 'Backspace':
@@ -518,23 +531,40 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
                 {/* Continue Watching Grid (tab 0) */}
                 {!loading && !error && isAuthenticated && activeTab === 0 && items.length > 0 && (
-                    <div className="media-grid">
-                        {items.map((item, index) => (
-                            <MediaCard
-                                key={item.id}
-                                item={item}
-                                isFocused={index === gridIndex}
-                                onSelect={() => {
-                                    setSelectedItem(item)
-                                    if (item.type === 'series') {
-                                        setShowShowDetail(true)
-                                    } else {
-                                        setShowDetail(true)
-                                        setPlayerBtnIndex(0)
-                                    }
-                                }}
-                            />
-                        ))}
+                    <div className="media-section-wrap">
+                        {continueWatchingItems.length > 0 && (
+                            <div className="media-section">
+                                <h2 className="section-title">Continue Watching</h2>
+                                <div className="media-grid">
+                                    {continueWatchingItems.map((item, index) => (
+                                        <MediaCard
+                                            key={item.id}
+                                            item={item}
+                                            isFocused={index === gridIndex}
+                                            onSelect={() => openItem(item)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {nextUpItems.length > 0 && (
+                            <div className="media-section">
+                                <h2 className="section-title">Next Up</h2>
+                                <div className="media-grid">
+                                    {nextUpItems.map((item, index) => {
+                                        const globalIndex = continueWatchingItems.length + index
+                                        return (
+                                            <MediaCard
+                                                key={item.id}
+                                                item={item}
+                                                isFocused={globalIndex === gridIndex}
+                                                onSelect={() => openItem(item)}
+                                            />
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -546,15 +576,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                 key={item.id}
                                 item={item}
                                 isFocused={index === gridIndex}
-                                onSelect={() => {
-                                    setSelectedItem(item)
-                                    if (item.type === 'series') {
-                                        setShowShowDetail(true)
-                                    } else {
-                                        setShowDetail(true)
-                                        setPlayerBtnIndex(0)
-                                    }
-                                }}
+                                onSelect={() => openItem(item)}
                             />
                         ))}
                     </div>

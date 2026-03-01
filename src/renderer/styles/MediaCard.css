@@ -112,14 +112,25 @@
     font-size: 0.95rem;
     font-weight: 500;
     margin: 0;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
     transition: color 200ms ease;
 }
 
 .media-card.focused .media-card-title {
     color: #42a5f5;
+}
+
+.media-card-subtitle {
+    font-size: 0.78rem;
+    margin: 0;
+    opacity: 0.75;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .media-card-year {

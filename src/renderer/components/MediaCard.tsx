@@ -10,6 +10,9 @@ interface MediaCardItem {
     playedPercentage?: number
     year?: number
     type: string
+    seriesName?: string
+    seasonNumber?: number
+    episodeNumber?: number
 }
 
 interface MediaCardProps {
@@ -21,6 +24,11 @@ interface MediaCardProps {
 
 const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect, showProgress = true }) => {
     const [imgFailed, setImgFailed] = useState(false)
+    const isEpisode = item.type === 'episode' && !!item.seriesName
+    const episodeCode =
+        typeof item.seasonNumber === 'number' && typeof item.episodeNumber === 'number'
+            ? `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`
+            : ''
 
     return (
         <div
@@ -59,7 +67,16 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
             </div>
 
             <div className="media-card-info">
-                <h3 className="media-card-title">{item.title}</h3>
+                {isEpisode ? (
+                    <>
+                        <h3 className="media-card-title">{item.seriesName}</h3>
+                        <p className="media-card-subtitle">
+                            {episodeCode ? `${episodeCode} ` : ''}{item.title}
+                        </p>
+                    </>
+                ) : (
+                    <h3 className="media-card-title">{item.title}</h3>
+                )}
                 {item.year && (
                     <span className="media-card-year">{item.year}</span>
                 )}
