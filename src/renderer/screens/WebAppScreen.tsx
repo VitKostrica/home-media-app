@@ -57,11 +57,12 @@ const WebAppScreen: React.FC<WebAppScreenProps> = ({ appId, onNavigate }) => {
             </div>
 
             <div className="web-app-content">
-                <iframe
+                <webview
+                    key={`${appId}-${url}`}
                     className="web-app-frame"
                     src={url}
-                    title={WEB_APPS[appId].title}
-                    allow="autoplay; fullscreen"
+                    allowpopups="true"
+                    partition="persist:home-media-webapps"
                 />
             </div>
         </div>
