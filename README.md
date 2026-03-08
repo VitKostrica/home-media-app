@@ -68,6 +68,29 @@ public/            # Static assets
 - **OK/Enter** – Confirm, play/pause
 - **Back** – Go back, exit
 
+### Custom Key Bindings
+
+You can add alternative keys for remote/airmouse buttons in the app config file:
+
+- Linux path: `~/.config/home-media-app/config.json`
+
+Example:
+
+```json
+{
+  "moviesBasePath": "/mnt/media/Movies",
+  "showsBasePath": "/mnt/media/Shows",
+  "keybindings": {
+    "confirm": ["NumpadEnter", "MediaPlayPause"],
+    "back": ["BrowserBack", "GoBack"]
+  }
+}
+```
+
+Default keys always stay active; configured keys are treated as additional alternatives.
+
+If `moviesBasePath` / `showsBasePath` are set, the app will try to remap Jellyfin-reported file paths to those local folders for playback.
+
 ## For More Details
 
 See [VISION.MD](./VISION.MD) for the complete product vision and specification.

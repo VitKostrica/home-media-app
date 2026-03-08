@@ -3,6 +3,7 @@ import '../styles/ContinueWatchingScreen.css'
 import MediaCard from '../components/MediaCard'
 import VideoPlayer from '../components/VideoPlayer'
 import JellyfinLogin from '../components/JellyfinLogin'
+import { useKeybindings } from '../hooks/useKeybindings'
 
 interface MediaItem {
     id: string
@@ -33,8 +34,9 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
         'continue'
     )
     const [playingItem, setPlayingItem] = useState<MediaItem | null>(null)
-    const [selectedPlayerType, setSelectedPlayerType] = useState<'mpv' | 'vlc'>('mpv')
+    const [selectedPlayerType, setSelectedPlayerType] = useState<'html5' | 'vlc'>('html5')
     const [showPlayerSelect, setShowPlayerSelect] = useState<MediaItem | null>(null)
+    const { matches } = useKeybindings()
 
     // Check auth on mount
     useEffect(() => {
@@ -85,11 +87,6 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
                         item.playedPercentage &&
                         item.playedPercentage < 90
                 )
-                .sort(
-                    (a, b) =>
-                        (new Date(b.watched).getTime() || 0) -
-                        (new Date(a.watched).getTime() || 0)
-                )
                 .slice(0, 12)
 
             // For next episodes, we'd need more complex logic to get the next episode of each series
@@ -114,68 +111,68 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
 
             // Handle player selection modal
             if (showPlayerSelect) {
-                switch (event.key) {
-                    case 'ArrowLeft':
-                        event.preventDefault()
-                        setSelectedPlayerType('html5')
-                        break
-                    case 'ArrowRight':
-                        event.preventDefault()
-                        setSelectedPlayerType('vlc')
-                        break
-                    case 'Enter':
-                    case ' ':
-                        event.preventDefault()
-                        playWithPlayer(showPlayerSelect, selectedPlayerType === 'html5' ? 'html5' : 'vlc')
-                        break
-                    case 'Backspace':
-                        event.preventDefault()
-                        setShowPlayerSelect(null)
-                        break
+                if (matches(event.key, 'left')) {
+                    event.preventDefault()
+                    setSelectedPlayerType('html5')
+                    return
+                }
+                if (matches(event.key, 'right')) {
+                    event.preventDefault()
+                    setSelectedPlayerType('vlc')
+                    return
+                }
+                if (matches(event.key, 'confirm')) {
+                    event.preventDefault()
+                    playWithPlayer(showPlayerSelect, selectedPlayerType)
+                    return
+                }
+                if (matches(event.key, 'back')) {
+                    event.preventDefault()
+                    setShowPlayerSelect(null)
                 }
                 return
             }
 
             const items = currentRow === 'continue' ? continueWatching : nextEpisodes
-            const itemsPerRow = 6
-
-            switch (event.key) {
-                case 'ArrowRight':
-                    event.preventDefault()
-                    setFocusedIndex((prev) => (prev + 1) % items.length)
-                    break
-                case 'ArrowLeft':
-                    event.preventDefault()
-                    setFocusedIndex((prev) => (prev - 1 + items.length) % items.length)
-                    break
-                case 'ArrowDown':
-                    event.preventDefault()
-                    if (currentRow === 'continue' && nextEpisodes.length > 0) {
-                        setCurrentRow('next')
-                        setFocusedIndex(Math.min(focusedIndex, nextEpisodes.length - 1))
-                    }
-                    break
-                case 'ArrowUp':
-                    event.preventDefault()
-                    if (currentRow === 'next' && continueWatching.length > 0) {
-                        setCurrentRow('continue')
-                        setFocusedIndex(Math.min(focusedIndex, continueWatching.length - 1))
-                    }
-                    break
-                case 'Enter':
-                case ' ':
-                    event.preventDefault()
-                    if (items[focusedIndex]) {
-                        playMedia(items[focusedIndex])
-                    }
-                    break
-                case 'Backspace':
-                    event.preventDefault()
-                    onNavigate('home')
-                    break
+            if (matches(event.key, 'right')) {
+                event.preventDefault()
+                setFocusedIndex((prev) => (prev + 1) % items.length)
+                return
+            }
+            if (matches(event.key, 'left')) {
+                event.preventDefault()
+                setFocusedIndex((prev) => (prev - 1 + items.length) % items.length)
+                return
+            }
+            if (matches(event.key, 'down')) {
+                event.preventDefault()
+                if (currentRow === 'continue' && nextEpisodes.length > 0) {
+                    setCurrentRow('next')
+                    setFocusedIndex(Math.min(focusedIndex, nextEpisodes.length - 1))
+                }
+                return
+            }
+            if (matches(event.key, 'up')) {
+                event.preventDefault()
+                if (currentRow === 'next' && continueWatching.length > 0) {
+                    setCurrentRow('continue')
+                    setFocusedIndex(Math.min(focusedIndex, continueWatching.length - 1))
+                }
+                return
+            }
+            if (matches(event.key, 'confirm')) {
+                event.preventDefault()
+                if (items[focusedIndex]) {
+                    playMedia(items[focusedIndex])
+                }
+                return
+            }
+            if (matches(event.key, 'back')) {
+                event.preventDefault()
+                onNavigate('home')
             }
         },
-        [playingItem, currentRow, focusedIndex, continueWatching, nextEpisodes, onNavigate, showPlayerSelect, selectedPlayerType]
+        [playingItem, currentRow, focusedIndex, continueWatching, nextEpisodes, onNavigate, showPlayerSelect, selectedPlayerType, matches]
     )
 
     useEffect(() => {
@@ -256,7 +253,7 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
     }
 
     if (!isAuthenticated) {
-        return <JellyfinLogin onBack={() => onNavigate('home')} />
+        return <JellyfinLogin onSuccess={() => setIsAuthenticated(true)} />
     }
 
     if (playingItem && selectedPlayerType === 'html5') {

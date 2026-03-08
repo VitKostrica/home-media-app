@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import '../styles/HomeScreen.css'
 import Tile from '../components/Tile'
+import { useKeybindings } from '../hooks/useKeybindings'
 
 interface AppTile {
     id: string
@@ -54,37 +55,41 @@ interface HomeScreenProps {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     const [focusedIndex, setFocusedIndex] = useState(0)
+    const { matches } = useKeybindings()
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             const cols = 6
             const rows = 1
 
-            switch (event.key) {
-                case 'ArrowRight':
-                    event.preventDefault()
-                    setFocusedIndex((prev) => (prev + 1) % (cols * rows))
-                    break
-                case 'ArrowLeft':
-                    event.preventDefault()
-                    setFocusedIndex((prev) => (prev - 1 + cols * rows) % (cols * rows))
-                    break
-                case 'Enter':
-                case ' ':
-                    event.preventDefault()
-                    handleSelect(focusedIndex)
-                    break
-                case 'Backspace':
-                    event.preventDefault()
-                    // Back from home = close app
-                    handleClose()
-                    break
+            if (matches(event.key, 'right')) {
+                event.preventDefault()
+                setFocusedIndex((prev) => (prev + 1) % (cols * rows))
+                return
+            }
+
+            if (matches(event.key, 'left')) {
+                event.preventDefault()
+                setFocusedIndex((prev) => (prev - 1 + cols * rows) % (cols * rows))
+                return
+            }
+
+            if (matches(event.key, 'confirm')) {
+                event.preventDefault()
+                handleSelect(focusedIndex)
+                return
+            }
+
+            if (matches(event.key, 'back')) {
+                event.preventDefault()
+                // Back from home = close app
+                handleClose()
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [focusedIndex, onNavigate])
+    }, [focusedIndex, onNavigate, matches])
 
     const handleSelect = (index: number) => {
         const tile = HOME_TILES[index]

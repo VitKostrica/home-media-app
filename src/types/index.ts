@@ -1,4 +1,5 @@
 // Shared types for the application
+import type { KeybindingsConfig } from './keybindings'
 
 export interface MediaItem {
     id: string
@@ -56,11 +57,15 @@ export interface AppConfig {
     jellyfinUserId: string
     jellyfinUsername: string
     mediaBasePath: string
+    moviesBasePath: string
+    showsBasePath: string
     defaultPlayer: PlayerType
+    keybindings: KeybindingsConfig
 }
 
 export interface ElectronAPI {
     close: () => Promise<void>
+    restart: () => Promise<void>
     playerApi: {
         launch: (player: PlayerType, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) => Promise<{ success: boolean; error?: string }>
         play: () => Promise<void>
@@ -78,6 +83,8 @@ export interface ElectronAPI {
         getEpisodes: (seriesId: string, seasonId: string) => Promise<MediaItem[]>
         getResumeItems: () => Promise<MediaItem[]>
         getNextUpItems: () => Promise<MediaItem[]>
+        getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
+        reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
         reportProgress: (itemId: string, positionTicks: number) => Promise<void>
         reportStopped: (itemId: string, positionTicks: number) => Promise<void>
     }
@@ -85,6 +92,8 @@ export interface ElectronAPI {
         get: () => Promise<AppConfig>
         set: (config: Partial<AppConfig>) => Promise<void>
     }
+    on: (channel: string, listener: (...args: any[]) => void) => void
+    off: (channel: string, listener: (...args: any[]) => void) => void
 }
 
 declare global {

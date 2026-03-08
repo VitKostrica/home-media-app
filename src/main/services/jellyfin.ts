@@ -1,4 +1,6 @@
 import axios, { AxiosInstance } from 'axios'
+import fs from 'fs'
+import path from 'path'
 import { getConfig, setConfig } from './config'
 
 // Jellyfin API response types
@@ -50,13 +52,55 @@ interface MappedItem {
     episodeNumber?: number
 }
 
-interface PlaybackInfoResponse {
-    MediaSources?: Array<{
-        DirectStreamUrl?: string
-        TranscodingUrl?: string
-        Path?: string
-        Protocol?: string
-    }>
+function normalizeFsPath(input: string): string {
+    return input.replace(/\\/g, '/')
+}
+
+function mapToLibraryBase(originalPath: string, libraryBasePath: string, libraryMarkers: string[]): string {
+    if (!libraryBasePath) {
+        return originalPath
+    }
+
+    const normalizedOriginal = normalizeFsPath(originalPath)
+    const lowerOriginal = normalizedOriginal.toLowerCase()
+    const normalizedBase = path.normalize(libraryBasePath)
+
+    for (const marker of libraryMarkers) {
+        const markerToken = `/${marker.toLowerCase()}/`
+        const markerIdx = lowerOriginal.indexOf(markerToken)
+        if (markerIdx >= 0) {
+            const relPart = normalizedOriginal.slice(markerIdx + markerToken.length)
+            const markerCandidate = path.join(normalizedBase, relPart)
+            if (fs.existsSync(markerCandidate)) {
+                return markerCandidate
+            }
+        }
+    }
+
+    // Fallback: try filename-only mapping for simplified libraries.
+    const filenameCandidate = path.join(normalizedBase, path.basename(originalPath))
+    if (fs.existsSync(filenameCandidate)) {
+        return filenameCandidate
+    }
+
+    return originalPath
+}
+
+function resolveItemPath(itemPath: string | undefined, itemType: MappedItem['type']): string | undefined {
+    if (!itemPath) {
+        return undefined
+    }
+
+    const config = getConfig()
+    if (itemType === 'movie' && config.moviesBasePath) {
+        return mapToLibraryBase(itemPath, config.moviesBasePath, ['movies'])
+    }
+
+    if ((itemType === 'series' || itemType === 'episode') && config.showsBasePath) {
+        return mapToLibraryBase(itemPath, config.showsBasePath, ['shows', 'tv', 'series'])
+    }
+
+    return itemPath
 }
 
 // Jellyfin auth header
@@ -123,8 +167,9 @@ function ensureAuth(): boolean {
 function mapItem(item: JellyfinItem): MappedItem {
     const config = getConfig()
     const token = accessToken || config.jellyfinApiKey
-    const filePath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
+    const jellyfinPath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
     const itemType = item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode'
+    const filePath = resolveItemPath(jellyfinPath, itemType)
 
     // Always use Jellyfin for poster images
     let posterUrl = item.ImageTags?.Primary

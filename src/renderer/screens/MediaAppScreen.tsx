@@ -4,6 +4,7 @@ import MediaCard from '../components/MediaCard'
 import JellyfinLogin from '../components/JellyfinLogin'
 import VideoPlayer from '../components/VideoPlayer'
 import ShowDetailModal from '../components/ShowDetailModal'
+import { useKeybindings } from '../hooks/useKeybindings'
 
 interface MediaItem {
     id: string
@@ -56,6 +57,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [selectedPlayerType, setSelectedPlayerType] = useState<'html5' | 'vlc'>('html5')
     const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
     const [nextUpItems, setNextUpItems] = useState<MediaItem[]>([])
+    const { matches } = useKeybindings()
 
     const gridRef = useRef<HTMLDivElement>(null)
 
@@ -297,7 +299,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         const handleKeyDown = (event: KeyboardEvent) => {
             // Don't intercept keys when video is playing
             if (playingItem || vlcPlayingItem) {
-                if (vlcPlayingItem && event.key === 'Backspace') {
+                if (vlcPlayingItem && matches(event.key, 'back')) {
                     // Allow closing VLC with Backspace
                     event.preventDefault()
                     window.electron?.playerApi?.stop()
@@ -325,88 +327,88 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
             // Player selection modal
             if (showPlayerSelect) {
-                switch (event.key) {
-                    case 'ArrowLeft':
-                        setPlayerBtnIndex(0)
-                        setSelectedPlayerType('html5')
-                        break
-                    case 'ArrowRight':
-                        setPlayerBtnIndex(1)
-                        setSelectedPlayerType('vlc')
-                        break
-                    case 'Enter':
-                    case ' ':
-                        playWithPlayer(showPlayerSelect, selectedPlayerType)
-                        break
-                    case 'Backspace':
-                        setShowPlayerSelect(null)
-                        break
+                if (matches(event.key, 'left')) {
+                    setPlayerBtnIndex(0)
+                    setSelectedPlayerType('html5')
+                    return
+                }
+                if (matches(event.key, 'right')) {
+                    setPlayerBtnIndex(1)
+                    setSelectedPlayerType('vlc')
+                    return
+                }
+                if (matches(event.key, 'confirm')) {
+                    playWithPlayer(showPlayerSelect, selectedPlayerType)
+                    return
+                }
+                if (matches(event.key, 'back')) {
+                    setShowPlayerSelect(null)
                 }
                 return
             }
 
             // Detail overlay mode
             if (showDetail) {
-                switch (event.key) {
-                    case 'ArrowLeft':
-                        setPlayerBtnIndex(0)
-                        break
-                    case 'ArrowRight':
-                        setPlayerBtnIndex(1)
-                        break
-                    case 'Enter':
-                    case ' ':
-                        handlePlay(playerBtnIndex === 0 ? 'html5' : 'vlc')
-                        break
-                    case 'Backspace':
-                        setShowDetail(false)
-                        setSelectedItem(null)
-                        break
+                if (matches(event.key, 'left')) {
+                    setPlayerBtnIndex(0)
+                    return
+                }
+                if (matches(event.key, 'right')) {
+                    setPlayerBtnIndex(1)
+                    return
+                }
+                if (matches(event.key, 'confirm')) {
+                    handlePlay(playerBtnIndex === 0 ? 'html5' : 'vlc')
+                    return
+                }
+                if (matches(event.key, 'back')) {
+                    setShowDetail(false)
+                    setSelectedItem(null)
                 }
                 return
             }
 
             // Grid browsing mode
-            switch (event.key) {
-                case 'ArrowLeft':
-                    if (gridIndex > 0) {
-                        setGridIndex(prev => prev - 1)
-                    }
-                    break
-                case 'ArrowRight':
-                    if (gridIndex < items.length - 1) {
-                        setGridIndex(prev => prev + 1)
-                    }
-                    break
-                case 'ArrowUp': {
-                    const newIdx = gridIndex - COLUMNS
-                    if (newIdx >= 0) {
-                        setGridIndex(newIdx)
-                    }
-                    break
+            if (matches(event.key, 'left')) {
+                if (gridIndex > 0) {
+                    setGridIndex(prev => prev - 1)
                 }
-                case 'ArrowDown': {
-                    const newIdx = gridIndex + COLUMNS
-                    if (newIdx < items.length) {
-                        setGridIndex(newIdx)
-                    }
-                    break
+                return
+            }
+            if (matches(event.key, 'right')) {
+                if (gridIndex < items.length - 1) {
+                    setGridIndex(prev => prev + 1)
                 }
-                case 'Enter':
-                case ' ':
-                    if (items[gridIndex]) {
-                        openItem(items[gridIndex])
-                    }
-                    break
-                case 'Backspace':
-                    onNavigate('home')
-                    break
+                return
+            }
+            if (matches(event.key, 'up')) {
+                const newIdx = gridIndex - COLUMNS
+                if (newIdx >= 0) {
+                    setGridIndex(newIdx)
+                }
+                return
+            }
+            if (matches(event.key, 'down')) {
+                const newIdx = gridIndex + COLUMNS
+                if (newIdx < items.length) {
+                    setGridIndex(newIdx)
+                }
+                return
+            }
+            if (matches(event.key, 'confirm')) {
+                if (items[gridIndex]) {
+                    openItem(items[gridIndex])
+                }
+                return
+            }
+            if (matches(event.key, 'back')) {
+                onNavigate('home')
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [gridIndex, items, showDetail, playerBtnIndex, handlePlay, onNavigate, isAuthenticated, playingItem, vlcPlayingItem, showPlayerSelect, selectedPlayerType, playWithPlayer])
+    }, [gridIndex, items, showDetail, playerBtnIndex, handlePlay, onNavigate, isAuthenticated, playingItem, vlcPlayingItem, showPlayerSelect, selectedPlayerType, playWithPlayer, matches])
 
     // Scroll focused card into view
     useEffect(() => {
@@ -722,7 +724,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     onPlay={(episode) => {
                         setShowShowDetail(false)
                         setSelectedItem(null)
-                        setShowPlayerSelect(episode)
+                        setShowPlayerSelect({
+                            ...episode,
+                            type: 'episode',
+                        })
                     }}
                 />
             )}

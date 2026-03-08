@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import '../styles/WebAppScreen.css'
+import { useKeybindings } from '../hooks/useKeybindings'
 
 type WebAppId = 'youtube' | 'disney-plus' | 'prime-video' | 'sweet-tv' | 'jellyfin'
 
@@ -22,6 +23,7 @@ const WEB_APPS: Record<WebAppId, { title: string; url: string; userAgent?: strin
 const WebAppScreen: React.FC<WebAppScreenProps> = ({ appId, onNavigate }) => {
     const [url, setUrl] = useState(WEB_APPS[appId].url)
     const webviewRef = useRef<HTMLElement | null>(null)
+    const { matches } = useKeybindings()
 
     useEffect(() => {
         const resolveUrl = async () => {
@@ -41,14 +43,14 @@ const WebAppScreen: React.FC<WebAppScreenProps> = ({ appId, onNavigate }) => {
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Backspace') {
+            if (matches(event.key, 'back')) {
                 event.preventDefault()
                 onNavigate('home')
             }
         }
         window.addEventListener('keydown', onKeyDown)
         return () => window.removeEventListener('keydown', onKeyDown)
-    }, [onNavigate])
+    }, [onNavigate, matches])
 
     useEffect(() => {
         const webview = webviewRef.current as any
@@ -85,7 +87,7 @@ const WebAppScreen: React.FC<WebAppScreenProps> = ({ appId, onNavigate }) => {
                     }}
                     className="web-app-frame"
                     src={url}
-                    allowpopups="true"
+                    allowpopups={true}
                     partition="persist:home-media-webapps"
                     useragent={WEB_APPS[appId].userAgent}
                 />
