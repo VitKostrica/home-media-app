@@ -212,7 +212,8 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
                     'vlc',
                     item.filePath,
                     startPosition,
-                    item.id
+                    item.id,
+                    item.duration
                 )
                 if (result?.success) {
                     setPlayingItem(item)

@@ -557,14 +557,25 @@ export async function reportProgress(itemId: string, positionTicks: number, play
     }
 }
 
+interface ReportStoppedOptions {
+    markPlayed?: boolean
+    datePlayed?: string
+}
+
 /** Tell Jellyfin playback has stopped */
-export async function reportStopped(itemId: string, positionTicks: number, playSessionId?: string): Promise<void> {
+export async function reportStopped(
+    itemId: string,
+    positionTicks: number,
+    playSessionId?: string,
+    options: ReportStoppedOptions = {}
+): Promise<void> {
     if (!ensureAuth()) return
 
     try {
         const api = getClient()
+        const playedAt = options.datePlayed || new Date().toISOString()
         console.log(
-            `[JellyfinPlayback] -> Stopped item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks}`
+            `[JellyfinPlayback] -> Stopped item=${itemId} sec=${Math.floor(positionTicks / 10000000)} ticks=${positionTicks} markPlayed=${options.markPlayed ? 'yes' : 'no'}`
         )
         const normalizedItemId = idToGuid(itemId)
         await api.post(
@@ -576,14 +587,31 @@ export async function reportStopped(itemId: string, positionTicks: number, playS
             },
             { headers: getHeaders() }
         )
-        // Fallback persistence for resume position if session-based tracking is ignored by server.
-        await api.post(
-            `/Users/${userId}/Items/${normalizedItemId}/UserData`,
-            {
-                PlaybackPositionTicks: positionTicks,
-            },
-            { headers: getHeaders() }
-        )
+
+        if (options.markPlayed) {
+            await api.post(
+                `/Users/${userId}/PlayedItems/${itemId}?DatePlayed=${encodeURIComponent(playedAt)}`,
+                null,
+                { headers: getHeaders() }
+            )
+            await api.post(
+                `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+                {
+                    PlaybackPositionTicks: 0,
+                },
+                { headers: getHeaders() }
+            )
+            console.log(`[JellyfinPlayback] <- Marked played item=${itemId} at ${playedAt}`)
+        } else {
+            // Fallback persistence for resume position if session-based tracking is ignored by server.
+            await api.post(
+                `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+                {
+                    PlaybackPositionTicks: positionTicks,
+                },
+                { headers: getHeaders() }
+            )
+        }
         console.log('[JellyfinPlayback] <- Stopped ok')
     } catch (err) {
         handleAuthError(err)
