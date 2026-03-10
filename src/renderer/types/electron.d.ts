@@ -1,3 +1,5 @@
+import type { AppConfig } from '../../types'
+
 declare global {
     interface Window {
         electron: {
@@ -26,8 +28,8 @@ declare global {
                 reportStopped: (itemId: string, positionTicks: number) => Promise<void>
             }
             configApi: {
-                get: () => Promise<any>
-                set: (config: Record<string, any>) => Promise<void>
+                get: () => Promise<AppConfig>
+                set: (config: Partial<AppConfig>) => Promise<void>
             }
             fileApi: {
                 getLocalImagePath: (itemId: string) => Promise<string>

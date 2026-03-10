@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import '../styles/VideoPlayer.css'
+import { useKeybindings } from '../hooks/useKeybindings'
 
 interface VideoPlayerProps {
     filePath: string
@@ -26,6 +27,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const [volume, setVolume] = useState(1)
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const { matches } = useKeybindings()
 
     // Auto-hide controls after inactivity
     const resetControlsTimeout = useCallback(() => {
@@ -152,47 +154,56 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             video.removeEventListener('ended', handleEnded)
             window.removeEventListener('keydown', handleKeyDown)
         }
-    }, [filePath, startPosition, onEnded, jellyfinItemId])
+    }, [filePath, startPosition, onEnded, jellyfinItemId, matches, onClose])
 
     const handlePlayerKeydown = (e: KeyboardEvent) => {
         resetControlsTimeout()
 
-        switch (e.key) {
-            case 'Enter':
-            case ' ':
-                e.preventDefault()
-                togglePlayPause()
-                break
-            case 'ArrowRight':
-                e.preventDefault()
-                seek(10)
-                break
-            case 'ArrowLeft':
-                e.preventDefault()
-                seek(-10)
-                break
-            case 'ArrowUp':
-                e.preventDefault()
-                changeVolume(0.1)
-                break
-            case 'ArrowDown':
-                e.preventDefault()
-                changeVolume(-0.1)
-                break
-            case 'Backspace':
-                e.preventDefault()
-                onClose()
-                break
-            case 'm':
-            case 'M':
-                e.preventDefault()
-                toggleMute()
-                break
-            case 'f':
-            case 'F':
-                e.preventDefault()
-                toggleFullscreen()
-                break
+        if (matches(e.key, 'confirm')) {
+            e.preventDefault()
+            togglePlayPause()
+            return
+        }
+
+        if (matches(e.key, 'right')) {
+            e.preventDefault()
+            seek(10)
+            return
+        }
+
+        if (matches(e.key, 'left')) {
+            e.preventDefault()
+            seek(-10)
+            return
+        }
+
+        if (matches(e.key, 'up')) {
+            e.preventDefault()
+            changeVolume(0.1)
+            return
+        }
+
+        if (matches(e.key, 'down')) {
+            e.preventDefault()
+            changeVolume(-0.1)
+            return
+        }
+
+        if (matches(e.key, 'back')) {
+            e.preventDefault()
+            onClose()
+            return
+        }
+
+        if (e.key === 'm' || e.key === 'M') {
+            e.preventDefault()
+            toggleMute()
+            return
+        }
+
+        if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault()
+            toggleFullscreen()
         }
     }
 

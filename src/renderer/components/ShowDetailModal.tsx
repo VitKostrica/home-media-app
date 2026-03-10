@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import '../styles/ShowDetailModal.css'
 import LazyImage from './LazyImage'
+import { useKeybindings } from '../hooks/useKeybindings'
 
 interface Episode {
     id: string
@@ -46,6 +47,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
     const [selectedIndex, setSelectedIndex] = useState(0)
     const [columnCount] = useState(6)
     const [continueWatchingEpisode, setContinueWatchingEpisode] = useState<Episode | null>(null)
+    const { matches } = useKeybindings()
 
     // Fetch seasons and find continue watching episode
     useEffect(() => {
@@ -107,7 +109,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Backspace' || e.key === 'Escape') {
+        if (matches(e.key, 'back')) {
             if (viewMode === 'show') {
                 onClose()
             } else if (viewMode === 'episodes') {
@@ -119,37 +121,37 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
 
         if (viewMode === 'show') {
             const rowSize = columnCount
-            if (e.key === 'ArrowDown') {
+            if (matches(e.key, 'down')) {
                 setSelectedIndex(Math.min(selectedIndex + rowSize, seasons.length - 1))
                 e.preventDefault()
-            } else if (e.key === 'ArrowUp') {
+            } else if (matches(e.key, 'up')) {
                 setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
                 e.preventDefault()
-            } else if (e.key === 'ArrowRight') {
+            } else if (matches(e.key, 'right')) {
                 setSelectedIndex(Math.min(selectedIndex + 1, seasons.length - 1))
                 e.preventDefault()
-            } else if (e.key === 'ArrowLeft') {
+            } else if (matches(e.key, 'left')) {
                 setSelectedIndex(Math.max(selectedIndex - 1, 0))
                 e.preventDefault()
-            } else if (e.key === 'Enter' || e.key === ' ') {
+            } else if (matches(e.key, 'confirm')) {
                 handleSeasonSelect(seasons[selectedIndex])
                 e.preventDefault()
             }
         } else if (viewMode === 'episodes') {
             const rowSize = columnCount
-            if (e.key === 'ArrowDown') {
+            if (matches(e.key, 'down')) {
                 setSelectedIndex(Math.min(selectedIndex + rowSize, episodes.length - 1))
                 e.preventDefault()
-            } else if (e.key === 'ArrowUp') {
+            } else if (matches(e.key, 'up')) {
                 setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
                 e.preventDefault()
-            } else if (e.key === 'ArrowRight') {
+            } else if (matches(e.key, 'right')) {
                 setSelectedIndex(Math.min(selectedIndex + 1, episodes.length - 1))
                 e.preventDefault()
-            } else if (e.key === 'ArrowLeft') {
+            } else if (matches(e.key, 'left')) {
                 setSelectedIndex(Math.max(selectedIndex - 1, 0))
                 e.preventDefault()
-            } else if (e.key === 'Enter' || e.key === ' ') {
+            } else if (matches(e.key, 'confirm')) {
                 const episode = episodes[selectedIndex]
                 onPlay(episode)
                 e.preventDefault()

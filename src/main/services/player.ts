@@ -14,6 +14,7 @@ let currentDurationSec = 0
 let stopRequestedByUser = false
 let currentPlaySessionId = ''
 let lastKnownPositionSec = 0
+const COMPLETE_THRESHOLD_RATIO = 0.95
 
 function ticksToSec(ticks: number): number {
     return Math.floor(ticks / 10000000)
@@ -51,6 +52,14 @@ function getReportedStopPositionTicks(): number {
     const durationTicks = currentDurationSec * 10000000
     const maxForcedStopTicks = Math.floor(durationTicks * 0.9)
     return Math.min(estimatedTicks, maxForcedStopTicks)
+}
+
+function didFinishPlayback(positionTicks: number): boolean {
+    if (stopRequestedByUser || currentDurationSec <= 0) {
+        return false
+    }
+    const durationTicks = currentDurationSec * 10000000
+    return positionTicks >= Math.floor(durationTicks * COMPLETE_THRESHOLD_RATIO)
 }
 
 async function refreshVlcPositionIfPossible(): Promise<void> {
@@ -207,10 +216,11 @@ export function launchPlayer(
             if (currentItemId) {
                 const estimatedTicks = getBestKnownPositionTicks()
                 const positionTicks = getReportedStopPositionTicks()
+                const markPlayed = didFinishPlayback(positionTicks)
                 console.log(
-                    `[PlaybackDebug] reportStopped item=${currentItemId} code=${code} stopRequested=${stopRequestedByUser} startSec=${playbackStartPositionSec} lastKnownSec=${lastKnownPositionSec} estimatedSec=${ticksToSec(estimatedTicks)} reportedSec=${ticksToSec(positionTicks)} durationSec=${currentDurationSec || 0}`
+                    `[PlaybackDebug] reportStopped item=${currentItemId} code=${code} stopRequested=${stopRequestedByUser} startSec=${playbackStartPositionSec} lastKnownSec=${lastKnownPositionSec} estimatedSec=${ticksToSec(estimatedTicks)} reportedSec=${ticksToSec(positionTicks)} durationSec=${currentDurationSec || 0} markPlayed=${markPlayed}`
                 )
-                jellyfinService.reportStopped(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
+                jellyfinService.reportStopped(currentItemId, positionTicks, currentPlaySessionId, { markPlayed }).catch((err) => {
                     console.error('[PlaybackDebug] reportStopped failed:', err?.message || err)
                 })
             } else {
