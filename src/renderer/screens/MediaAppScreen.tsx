@@ -548,7 +548,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                             <div className="detail-actions">
                                 <button className="play-button focused" onClick={handlePlay}>
                                     <span className="play-icon">▶</span>
-                                    Play with VLC
+                                    Play
                                 </button>
                             </div>
 
