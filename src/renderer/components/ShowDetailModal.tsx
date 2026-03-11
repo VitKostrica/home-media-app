@@ -280,11 +280,11 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                             )}
                                         </div>
                                         <div className="episode-info">
-                                            <p className="episode-number">
-                                                {episode.episodeNumber !== undefined ? `Episode ${episode.episodeNumber}` : 'Episode'}
-                                            </p>
-                                            <p className="episode-title">
-                                                {episode.title}
+                                            <p className="episode-label">
+                                                {episode.episodeNumber !== undefined
+                                                    ? `Episode ${episode.episodeNumber}`
+                                                    : 'Episode'}{' '}
+                                                - {episode.title || 'Untitled'}
                                             </p>
                                             {episode.overview && (
                                                 <p className="episode-description">{episode.overview}</p>
