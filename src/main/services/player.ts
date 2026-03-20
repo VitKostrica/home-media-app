@@ -1,6 +1,9 @@
 import { spawn, ChildProcess } from 'child_process'
 import { BrowserWindow } from 'electron'
+import fs from 'fs'
 import * as jellyfinService from './jellyfin'
+import net from 'net'
+import os from 'os'
 import path from 'path'
 
 type PlayerType = 'mpv' | 'vlc'
@@ -17,6 +20,8 @@ let lastKnownPositionSec = 0
 let currentPlayerType: PlayerType | null = null
 let hasVlcLivePosition = false
 let vlcOutputBuffer = ''
+let currentVlcRcSocket: net.Socket | null = null
+let currentVlcRcSocketPath = ''
 const COMPLETE_THRESHOLD_RATIO = 0.9
 const FORCED_STOP_CAP_RATIO = 0.85
 
@@ -31,7 +36,23 @@ function clearProgressInterval() {
     }
 }
 
+function clearVlcRcSocket() {
+    if (currentVlcRcSocket) {
+        currentVlcRcSocket.destroy()
+        currentVlcRcSocket = null
+    }
+    if (currentVlcRcSocketPath) {
+        try {
+            fs.rmSync(currentVlcRcSocketPath, { force: true })
+        } catch {
+            // Ignore cleanup errors for the temporary VLC socket path.
+        }
+        currentVlcRcSocketPath = ''
+    }
+}
+
 function resetPlaybackState() {
+    clearVlcRcSocket()
     currentPlayer = null
     currentItemId = null
     playbackStartedAtMs = 0
@@ -76,6 +97,46 @@ function consumePlayerOutput(chunk: string) {
             updateLivePosition(Number(secondsMatch[1]))
         }
     }
+}
+
+function connectToVlcRcSocket(socketPath: string, launchedPlayer: ChildProcess, attempt = 0) {
+    if (currentPlayer !== launchedPlayer || !socketPath) {
+        return
+    }
+
+    const socket = net.createConnection({ path: socketPath })
+
+    socket.setEncoding('utf8')
+    socket.on('data', (chunk: string) => {
+        if (currentPlayer === launchedPlayer) {
+            consumePlayerOutput(chunk)
+        }
+    })
+    socket.on('connect', () => {
+        if (currentPlayer !== launchedPlayer) {
+            socket.destroy()
+            return
+        }
+        currentVlcRcSocket = socket
+    })
+    socket.on('error', (err) => {
+        socket.destroy()
+        if (currentPlayer !== launchedPlayer) {
+            return
+        }
+
+        if (attempt < 20) {
+            setTimeout(() => connectToVlcRcSocket(socketPath, launchedPlayer, attempt + 1), 100)
+            return
+        }
+
+        console.warn('[PlaybackDebug] Failed to connect to VLC RC socket:', err?.message || err)
+    })
+    socket.on('close', () => {
+        if (currentVlcRcSocket === socket) {
+            currentVlcRcSocket = null
+        }
+    })
 }
 
 function getEstimatedPositionTicks(): number {
@@ -153,6 +214,8 @@ export function launchPlayer(
     mainWindow?: BrowserWindow,
     durationSec?: number
 ): { success: boolean; error?: string } {
+    clearVlcRcSocket()
+
     // Kill existing player if running
     if (currentPlayer && !currentPlayer.killed) {
         clearProgressInterval()
@@ -185,7 +248,23 @@ export function launchPlayer(
         } else {
             // VLC - enable the remote control interface and emit position updates
             // so we can track pause/resume state without wall-clock drift.
-            args = ['--fullscreen', '--quiet', '--extraintf=rc', '--rc-show-pos']
+            // Use a local Unix socket so RC mode does not depend on stdin/tty state.
+            currentVlcRcSocketPath = path.join(
+                os.tmpdir(),
+                `home-media-app-vlc-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.sock`
+            )
+            try {
+                fs.rmSync(currentVlcRcSocketPath, { force: true })
+            } catch {
+                // Ignore cleanup errors before reusing the socket path.
+            }
+
+            args = [
+                '--fullscreen',
+                '--extraintf=rc',
+                `--rc-unix=${currentVlcRcSocketPath}`,
+                '--rc-show-pos',
+            ]
             if (startPosition && startPosition > 0) {
                 args.push(`--start-time=${startPosition}`)
             }
@@ -195,6 +274,9 @@ export function launchPlayer(
         const launchedPlayer = currentPlayer
 
         if (type === 'vlc' && currentPlayer) {
+            if (currentVlcRcSocketPath) {
+                connectToVlcRcSocket(currentVlcRcSocketPath, launchedPlayer)
+            }
             currentPlayer.stdout?.on('data', (chunk: Buffer) => {
                 consumePlayerOutput(chunk.toString('utf8'))
             })
@@ -326,6 +408,7 @@ export function launchPlayer(
 
         return { success: true }
     } catch (err: any) {
+        clearVlcRcSocket()
         return { success: false, error: err.message || `Failed to launch ${type}` }
     }
 }
