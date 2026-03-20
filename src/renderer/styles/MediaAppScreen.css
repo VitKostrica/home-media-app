@@ -256,7 +256,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 24px 48px;
+    padding: 20px 48px 12px;
     scrollbar-width: none;
 }
 
@@ -264,21 +264,31 @@
     display: none;
 }
 
+.continue-watching-view {
+    overflow-y: hidden;
+}
+
 /* ── Media Section (for Continue Watching + Next Episodes) */
 
+.media-section-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
 .media-section {
-    margin-bottom: 50px;
+    margin-bottom: 0;
 }
 
 .section-title {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     font-weight: 500;
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
     color: #fff;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 2px solid rgba(66, 165, 245, 0.6);
-    padding-bottom: 12px;
+    padding-bottom: 10px;
 }
 
 /* ── Media Grid ─────────────────────────────────────────── */
@@ -286,8 +296,12 @@
 .media-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 24px;
-    padding-bottom: 40px;
+    gap: 18px;
+    padding-bottom: 0;
+}
+
+.continue-watching-view .media-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 /* ── State Messages (loading, error, empty) ──────────────── */
