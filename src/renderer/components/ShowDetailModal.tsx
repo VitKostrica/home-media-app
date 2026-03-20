@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import '../styles/ShowDetailModal.css'
 import LazyImage from './LazyImage'
 import { useKeybindings } from '../hooks/useKeybindings'
+import { isEffectivelyFinished } from '../utils/playbackProgress'
 
 interface Episode {
     id: string
@@ -60,7 +61,9 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
             try {
                 const eps = await window.electron.jellyfinApi.getEpisodes(show.id, season.id)
                 // Find first episode with resume position or first unwatched
-                const resumeEp = eps.find((e: Episode) => e.resumePosition && e.resumePosition > 0)
+                const resumeEp = eps.find(
+                    (e: Episode) => e.resumePosition && e.resumePosition > 0 && !isEffectivelyFinished(e)
+                )
                 if (resumeEp) {
                     setContinueWatchingEpisode(resumeEp)
                     return
