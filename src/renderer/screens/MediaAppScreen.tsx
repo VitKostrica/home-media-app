@@ -4,6 +4,7 @@ import MediaCard from '../components/MediaCard'
 import JellyfinLogin from '../components/JellyfinLogin'
 import ShowDetailModal from '../components/ShowDetailModal'
 import { useKeybindings } from '../hooks/useKeybindings'
+import { isEffectivelyFinished } from '../utils/playbackProgress'
 
 interface MediaItem {
     id: string
@@ -133,7 +134,9 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 console.log(
                     `[Continue Watching] resume=${resumeItems?.length || 0}, nextUp=${nextUpItems?.length || 0}`
                 )
-                const resumeUnique = (resumeItems || []).filter((item) => item?.id)
+                const resumeUnique = (resumeItems || []).filter(
+                    (item) => item?.id && !isEffectivelyFinished(item)
+                )
                 const seenIds = new Set<string>(resumeUnique.map((item) => item.id))
                 const nextUpUnique = (nextUpItems || []).filter(
                     (item) => item?.id && !seenIds.has(item.id)
@@ -250,7 +253,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
                     // Refresh continue watching list and go back to it
                     setActiveTab(0) // Switch to Continue Watching tab
-                    fetchItems() // Reload the continue watching data
                 }
                 return
             }

@@ -3,6 +3,7 @@ import '../styles/ContinueWatchingScreen.css'
 import MediaCard from '../components/MediaCard'
 import JellyfinLogin from '../components/JellyfinLogin'
 import { useKeybindings } from '../hooks/useKeybindings'
+import { isEffectivelyFinished } from '../utils/playbackProgress'
 
 interface MediaItem {
     id: string
@@ -96,8 +97,7 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
                         item.watched === false &&
                         item.resumePosition &&
                         item.resumePosition > 0 &&
-                        item.playedPercentage &&
-                        item.playedPercentage < 90
+                        !isEffectivelyFinished(item)
                 )
                 .slice(0, 12)
 
@@ -153,7 +153,6 @@ const ContinueWatchingScreen: React.FC<ContinueWatchingScreenProps> = ({ onNavig
             // Ignore stop errors
         }
         setPlayingItem(null)
-        fetchItems()
     }, [])
 
     const handleKeyDown = useCallback(
