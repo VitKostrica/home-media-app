@@ -265,15 +265,7 @@
     padding: 12px;
 }
 
-.episode-number {
-    font-size: 11px;
-    color: #0066cc;
-    text-transform: uppercase;
-    margin: 0 0 4px 0;
-    font-weight: bold;
-}
-
-.episode-title {
+.episode-label {
     font-size: 13px;
     font-weight: 600;
     color: #fff;
