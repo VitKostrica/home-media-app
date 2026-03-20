@@ -3,7 +3,7 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: url('/app-icons/background.jpg') center center / cover no-repeat;
+    background: url('app-icons/background.jpg') center center / cover no-repeat;
     color: #fff;
     padding: 0;
     margin: 0;

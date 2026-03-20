@@ -16,37 +16,37 @@ const HOME_TILES: AppTile[] = [
     {
         id: 'custom-media',
         title: 'Custom Media',
-        icon: '/app-icons/jellyfin.png',
+        icon: 'app-icons/jellyfin.png',
         description: 'Local movies & shows',
     },
     {
         id: 'youtube',
         title: 'YouTube',
-        icon: '/app-icons/youtube.png',
+        icon: 'app-icons/youtube.png',
         description: 'Online videos',
     },
     {
         id: 'disney-plus',
         title: 'Disney+',
-        icon: '/app-icons/disney.png',
+        icon: 'app-icons/disney.png',
         description: 'Disney content',
     },
     {
         id: 'prime-video',
         title: 'Prime Video',
-        icon: '/app-icons/primevideo.png',
+        icon: 'app-icons/primevideo.png',
         description: 'Prime content',
     },
     {
         id: 'sweet-tv',
         title: 'Sweet.tv',
-        icon: '/app-icons/sweet.png',
+        icon: 'app-icons/sweet.png',
         description: 'Sweet.tv service',
     },
     {
         id: 'jellyfin',
         title: 'Jellyfin',
-        icon: '/app-icons/jellyfin.png',
+        icon: 'app-icons/jellyfin.png',
         description: 'Personal media server',
     },
 ]
@@ -285,7 +285,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     }
 
     return (
-        <div className="home-screen">
+        <div className="home-screen" style={{ backgroundImage: "url('app-icons/background.jpg')" }}>
             <div className="home-header">
                 <h1>Home Media Center</h1>
                 <div className="home-actions">

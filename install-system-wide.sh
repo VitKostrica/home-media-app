@@ -20,11 +20,9 @@ echo "Installing Home Media Center for all users..."
 echo "  From: $SOURCE_DIR"
 echo "  To:   $INSTALL_DIR"
 
-# Build if needed so production files are present
-if [[ ! -d "$SOURCE_DIR/dist" ]]; then
-    echo "Building app (dist/ not found)..."
-    (cd "$SOURCE_DIR" && npm run build)
-fi
+# Always rebuild so /opt gets the latest production bundle, not stale dist/
+echo "Building app..."
+(cd "$SOURCE_DIR" && npm run build)
 
 # Copy entire app
 echo "Copying files..."
