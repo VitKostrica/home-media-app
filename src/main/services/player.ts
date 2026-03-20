@@ -246,7 +246,7 @@ export function launchPlayer(
             args.push(filePath)
             currentPlayer = spawn('mpv', args, { detached: true, stdio: 'ignore' })
         } else {
-            // VLC - enable the remote control interface and emit position updates
+            // VLC - enable the oldrc interface and emit position updates
             // so we can track pause/resume state without wall-clock drift.
             // Use a local Unix socket so RC mode does not depend on stdin/tty state.
             currentVlcRcSocketPath = path.join(
@@ -261,7 +261,7 @@ export function launchPlayer(
 
             args = [
                 '--fullscreen',
-                '--extraintf=rc',
+                '--extraintf=oldrc',
                 `--rc-unix=${currentVlcRcSocketPath}`,
                 '--rc-show-pos',
             ]
