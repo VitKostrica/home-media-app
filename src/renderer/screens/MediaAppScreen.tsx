@@ -426,6 +426,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 return
             }
 
+            const safeGridIndex = Math.min(gridIndex, Math.max(items.length - 1, 0))
+
             if (focusedArea === 'sidebar') {
                 if (matches(event.key, 'up')) {
                     event.preventDefault()
@@ -455,8 +457,22 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
             if (matches(event.key, 'left')) {
                 event.preventDefault()
-                setFocusedArea('sidebar')
-                setSidebarIndex(1)
+                if (activeTab === 0) {
+                    if (continueIndex > 0) {
+                        setContinueIndex((prev) => Math.max(0, prev - 1))
+                    } else {
+                        setFocusedArea('sidebar')
+                        setSidebarIndex(1)
+                    }
+                    return
+                }
+
+                if (items.length > 0 && safeGridIndex % COLUMNS !== 0) {
+                    setGridIndex((prev) => Math.max(0, prev - 1))
+                } else {
+                    setFocusedArea('sidebar')
+                    setSidebarIndex(activeTab === 1 ? 2 : 3)
+                }
                 return
             }
 
@@ -501,8 +517,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 }
                 return
             }
-
-            const safeGridIndex = Math.min(gridIndex, Math.max(items.length - 1, 0))
 
             if (matches(event.key, 'right')) {
                 event.preventDefault()

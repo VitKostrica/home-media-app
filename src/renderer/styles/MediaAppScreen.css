@@ -184,7 +184,7 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .continue-watching-view {
@@ -196,6 +196,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: visible;
 }
 
 .media-section.focused .section-title {
@@ -252,9 +253,10 @@
 .media-grid {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 16px;
+    gap: 18px;
     width: 100%;
     min-height: 0;
+    overflow: visible;
 }
 
 .continue-watching-view .media-grid {
@@ -263,13 +265,17 @@
 
 .media-item-wrapper {
     position: relative;
+    width: calc(100% + 12px);
+    margin: 0 -6px;
+    justify-self: center;
     transition:
         transform 180ms ease,
         filter 180ms ease;
+    overflow: visible;
 }
 
 .media-item-wrapper.focused {
-    transform: scale(1.06);
+    transform: scale(1.04);
     filter: drop-shadow(0 0 22px rgba(66, 165, 245, 0.55));
     z-index: 5;
 }
