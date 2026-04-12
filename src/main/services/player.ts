@@ -27,6 +27,7 @@ let currentVlcRcSocket: net.Socket | null = null
 let currentVlcRcSocketPath = ''
 const COMPLETE_THRESHOLD_RATIO = 0.9
 const FORCED_STOP_CAP_RATIO = 0.85
+const PROGRESS_POLL_INTERVAL_MS = 1000
 
 function ticksToSec(ticks: number): number {
     return Math.floor(ticks / 10000000)
@@ -296,11 +297,14 @@ function startProgressReporting() {
     clearProgressInterval()
     progressInterval = setInterval(async () => {
         await refreshVlcPositionIfPossible()
+        if (currentPlayerType === 'vlc') {
+            await requestVlcTimeSnapshot(300)
+        }
         console.log(
             `[PlaybackDebug] progress tick item=${currentItemId || 'none'} paused=${isVlcPaused ? 'yes' : 'no'} elapsedMs=${getPlaybackElapsedMs()} liveSec=${ticksToSec(getBestKnownPositionTicks())}`
         )
         reportCurrentPlaybackProgress()
-    }, 10000)
+    }, PROGRESS_POLL_INTERVAL_MS)
 }
 
 /**
@@ -446,9 +450,7 @@ export function launchPlayer(
             jellyfinService.reportPlaybackStart(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
                 console.error('[PlaybackDebug] reportPlaybackStart failed:', err?.message || err)
             })
-            if (type === 'mpv') {
-                startProgressReporting()
-            }
+            startProgressReporting()
         } else {
             console.warn('[PlaybackDebug] Missing jellyfin item id, progress/stopped will not be reported')
         }
