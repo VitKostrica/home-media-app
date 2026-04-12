@@ -22,16 +22,9 @@ interface MediaCardProps {
     isFocused?: boolean
     onSelect?: () => void
     showProgress?: boolean
-    compact?: boolean
 }
 
-const MediaCard: React.FC<MediaCardProps> = ({
-    item,
-    isFocused = false,
-    onSelect,
-    showProgress = true,
-    compact = false,
-}) => {
+const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect, showProgress = true }) => {
     const [imgFailed, setImgFailed] = useState(false)
     const isEpisode = item.type === 'episode' && !!item.seriesName
     const episodeCode =
@@ -47,7 +40,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
 
     return (
         <div
-            className={`media-card ${isFocused ? 'focused' : ''} ${compact ? 'compact' : ''}`}
+            className={`media-card ${isFocused ? 'focused' : ''}`}
             onClick={onSelect}
         >
             <div className="media-card-poster">

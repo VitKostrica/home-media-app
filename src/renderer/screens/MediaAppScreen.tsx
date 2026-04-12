@@ -690,7 +690,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                                                 openItem(item)
                                                             }}
                                                             showProgress={true}
-                                                            compact={true}
                                                         />
                                                     </div>
                                                 ))}
@@ -723,7 +722,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                                                 focusContinueWatching('next', index)
                                                                 openItem(item)
                                                             }}
-                                                            compact={true}
                                                         />
                                                     </div>
                                                 ))}
