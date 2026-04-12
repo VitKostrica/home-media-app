@@ -1,10 +1,18 @@
+import axios from 'axios'
 import { spawn, ChildProcess } from 'child_process'
 import { BrowserWindow } from 'electron'
 import * as jellyfinService from './jellyfin'
-import net from 'net'
 import path from 'path'
 
 type PlayerType = 'mpv' | 'vlc'
+type VlcPlaybackState = 'playing' | 'paused' | 'stopped' | 'ended' | 'opening' | 'buffering' | string
+
+interface VlcStatusResponse {
+    time?: number
+    state?: VlcPlaybackState
+    length?: number
+    position?: number
+}
 
 let currentPlayer: ChildProcess | null = null
 let currentItemId: string | null = null
@@ -16,11 +24,11 @@ let stopRequestedByUser = false
 let currentPlaySessionId = ''
 let lastKnownPositionSec = 0
 let currentPlayerType: PlayerType | null = null
-let hasVlcLivePosition = false
-let vlcOutputBuffer = ''
-let currentVlcRcSocket: net.Socket | null = null
-let currentVlcTelnetPort = 0
-let currentVlcTelnetPassword = ''
+let currentVlcState: VlcPlaybackState = ''
+let currentVlcHttpPort = 0
+let currentVlcHttpPassword = ''
+let vlcStatusPollInFlight = false
+
 const COMPLETE_THRESHOLD_RATIO = 0.9
 const FORCED_STOP_CAP_RATIO = 0.85
 const PROGRESS_POLL_INTERVAL_MS = 1000
@@ -36,17 +44,15 @@ function clearProgressInterval() {
     }
 }
 
-function clearVlcRcSocket() {
-    if (currentVlcRcSocket) {
-        currentVlcRcSocket.destroy()
-        currentVlcRcSocket = null
-    }
-    currentVlcTelnetPort = 0
-    currentVlcTelnetPassword = ''
+function clearVlcState() {
+    currentVlcHttpPort = 0
+    currentVlcHttpPassword = ''
+    currentVlcState = ''
+    vlcStatusPollInFlight = false
 }
 
 function resetPlaybackState() {
-    clearVlcRcSocket()
+    clearVlcState()
     currentPlayer = null
     currentItemId = null
     playbackStartedAtMs = 0
@@ -56,8 +62,6 @@ function resetPlaybackState() {
     currentPlaySessionId = ''
     lastKnownPositionSec = 0
     currentPlayerType = null
-    hasVlcLivePosition = false
-    vlcOutputBuffer = ''
 }
 
 function updateLivePosition(positionSec: number) {
@@ -66,11 +70,6 @@ function updateLivePosition(positionSec: number) {
     }
 
     lastKnownPositionSec = Math.floor(positionSec)
-    hasVlcLivePosition = true
-}
-
-function wait(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function getPlaybackElapsedMs(): number {
@@ -88,110 +87,46 @@ function reportCurrentPlaybackProgress(forcePausedOverride?: boolean) {
 
     const ticks = getBestKnownPositionTicks()
     console.log(
-        `[PlaybackDebug] reportCurrentProgress item=${currentItemId} sec=${ticksToSec(ticks)} ticks=${ticks}`
+        `[PlaybackDebug] reportCurrentProgress item=${currentItemId} sec=${ticksToSec(ticks)} ticks=${ticks} paused=${forcePausedOverride === true}`
     )
-    jellyfinService.reportProgress(currentItemId, ticks, currentPlaySessionId, forcePausedOverride === true).catch((err) => {
-        console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
-    })
+    jellyfinService
+        .reportProgress(currentItemId, ticks, currentPlaySessionId, forcePausedOverride === true)
+        .catch((err) => {
+            console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
+        })
 }
 
-async function requestVlcTimeSnapshot(timeoutMs = 200): Promise<void> {
-    if (currentPlayerType !== 'vlc' || !currentVlcRcSocket || currentVlcRcSocket.destroyed) {
-        return
+async function requestVlcStatusSnapshot(timeoutMs = 300): Promise<boolean> {
+    if (currentPlayerType !== 'vlc' || !currentVlcHttpPort || !currentVlcHttpPassword || vlcStatusPollInFlight) {
+        return false
     }
 
-    const socket = currentVlcRcSocket
-    const before = lastKnownPositionSec
-
+    vlcStatusPollInFlight = true
     try {
-        socket.write('get_time\n')
-    } catch {
-        return
+        const response = await axios.get(`http://127.0.0.1:${currentVlcHttpPort}/requests/status.json`, {
+            auth: {
+                username: '',
+                password: currentVlcHttpPassword,
+            },
+            timeout: timeoutMs,
+        })
+
+        const data = response.data as VlcStatusResponse
+        if (typeof data.time === 'number' && Number.isFinite(data.time)) {
+            updateLivePosition(data.time)
+        }
+        if (data.state) {
+            currentVlcState = data.state
+        }
+        return true
+    } catch (err) {
+        if (currentPlayerType === 'vlc') {
+            console.warn('[PlaybackDebug] VLC status snapshot failed:', (err as any)?.message || err)
+        }
+        return false
+    } finally {
+        vlcStatusPollInFlight = false
     }
-
-    await wait(timeoutMs)
-
-    if (lastKnownPositionSec !== before) {
-        console.log(
-            `[PlaybackDebug] VLC snapshot item=${currentItemId || 'none'} sec=${lastKnownPositionSec}`
-        )
-    }
-}
-
-function consumePlayerOutput(chunk: string) {
-    vlcOutputBuffer += chunk
-    const lines = vlcOutputBuffer.split(/\r?\n/)
-    vlcOutputBuffer = lines.pop() || ''
-
-    for (const rawLine of lines) {
-        const line = rawLine.trim()
-        if (!line) {
-            continue
-        }
-
-        const timeMatch = line.match(/time:\s*(\d+(?:\.\d+)?)(?:s)?/i)
-        if (timeMatch?.[1]) {
-            updateLivePosition(Number(timeMatch[1]))
-            continue
-        }
-
-        const secondsMatch = line.match(/^\s*(\d+(?:\.\d+)?)\s*$/)
-        if (secondsMatch?.[1]) {
-            updateLivePosition(Number(secondsMatch[1]))
-        }
-    }
-}
-
-function connectToVlcRcSocket(port: number, launchedPlayer: ChildProcess, attempt = 0) {
-    if (currentPlayer !== launchedPlayer || !port) {
-        return
-    }
-
-    const socket = net.createConnection({ host: '127.0.0.1', port })
-
-    socket.setEncoding('utf8')
-    socket.on('data', (chunk: string) => {
-        if (currentPlayer === launchedPlayer) {
-            consumePlayerOutput(chunk)
-        }
-    })
-    socket.on('connect', () => {
-        if (currentPlayer !== launchedPlayer) {
-            socket.destroy()
-            return
-        }
-        currentVlcRcSocket = socket
-        if (currentVlcTelnetPassword) {
-            socket.write(`${currentVlcTelnetPassword}\n`)
-        }
-        setTimeout(() => {
-            if (currentPlayer === launchedPlayer && currentVlcRcSocket === socket && !socket.destroyed) {
-                try {
-                    socket.write('get_time\n')
-                } catch {
-                    // Ignore initial telnet query failure; the periodic poll will retry.
-                }
-            }
-        }, 200)
-    })
-    socket.on('error', (err) => {
-        socket.destroy()
-        if (currentPlayer !== launchedPlayer) {
-            return
-        }
-
-        if (attempt < 20) {
-            setTimeout(() => connectToVlcRcSocket(port, launchedPlayer, attempt + 1), 100)
-            return
-        }
-
-        console.warn('[PlaybackDebug] Failed to connect to VLC RC socket:', err?.message || err)
-    })
-    socket.on('close', () => {
-        if (currentVlcRcSocket === socket) {
-            currentVlcRcSocket = null
-        }
-    })
 }
 
 function getEstimatedPositionTicks(): number {
@@ -205,8 +140,7 @@ function getEstimatedPositionTicks(): number {
 
 function getBestKnownPositionTicks(): number {
     if (currentPlayerType === 'vlc') {
-        const vlcSec = hasVlcLivePosition ? lastKnownPositionSec : playbackStartPositionSec
-        return Math.max(0, vlcSec) * 10000000
+        return Math.max(0, lastKnownPositionSec) * 10000000
     }
 
     const estimatedSec = Math.floor(getEstimatedPositionTicks() / 10000000)
@@ -242,27 +176,21 @@ function didFinishPlayback(positionTicks: number): boolean {
 }
 
 async function refreshVlcPositionIfPossible(): Promise<void> {
-    if (currentPlayerType === 'vlc' && currentVlcRcSocket && !currentVlcRcSocket.destroyed) {
-        try {
-            currentVlcRcSocket.write('status\n')
-        } catch {
-            // Ignore transient RC write failures and fall back to the cached playback state.
-        }
+    if (currentPlayerType === 'vlc') {
+        await requestVlcStatusSnapshot(300)
     }
-    return
 }
 
 function startProgressReporting() {
     clearProgressInterval()
     progressInterval = setInterval(async () => {
         await refreshVlcPositionIfPossible()
-        if (currentPlayerType === 'vlc') {
-            await requestVlcTimeSnapshot(300)
-        }
+
+        const paused = currentPlayerType === 'vlc' && currentVlcState === 'paused'
         console.log(
-            `[PlaybackDebug] progress tick item=${currentItemId || 'none'} elapsedMs=${getPlaybackElapsedMs()} liveSec=${ticksToSec(getBestKnownPositionTicks())}`
+            `[PlaybackDebug] progress tick item=${currentItemId || 'none'} elapsedMs=${getPlaybackElapsedMs()} liveSec=${ticksToSec(getBestKnownPositionTicks())} vlcState=${currentPlayerType === 'vlc' ? currentVlcState || 'unknown' : 'n/a'}`
         )
-        reportCurrentPlaybackProgress()
+        reportCurrentPlaybackProgress(paused)
     }, PROGRESS_POLL_INTERVAL_MS)
 }
 
@@ -278,7 +206,7 @@ export function launchPlayer(
     mainWindow?: BrowserWindow,
     durationSec?: number
 ): { success: boolean; error?: string } {
-    clearVlcRcSocket()
+    clearVlcState()
 
     // Kill existing player if running
     if (currentPlayer && !currentPlayer.killed) {
@@ -293,8 +221,7 @@ export function launchPlayer(
     currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
     currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     lastKnownPositionSec = startPosition && startPosition > 0 ? startPosition : 0
-    hasVlcLivePosition = false
-    vlcOutputBuffer = ''
+    currentVlcState = ''
     console.log(
         `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} playSessionId=${currentPlaySessionId} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
     )
@@ -310,17 +237,17 @@ export function launchPlayer(
             args.push(filePath)
             currentPlayer = spawn('mpv', args, { detached: true, stdio: 'ignore' })
         } else {
-            // VLC - use the telnet interface so we can query the current time
-            // directly instead of estimating with wall-clock drift.
-            currentVlcTelnetPort = 4200 + Math.floor(Math.random() * 2000)
-            currentVlcTelnetPassword = Math.random().toString(36).slice(2, 12)
+            // VLC - use the HTTP interface so we can poll the current time and
+            // playback state directly instead of estimating with wall-clock drift.
+            currentVlcHttpPort = 4200 + Math.floor(Math.random() * 2000)
+            currentVlcHttpPassword = Math.random().toString(36).slice(2, 12)
 
             args = [
                 '--fullscreen',
-                '--extraintf=telnet',
-                '--telnet-host=127.0.0.1',
-                `--telnet-port=${currentVlcTelnetPort}`,
-                `--telnet-password=${currentVlcTelnetPassword}`,
+                '--extraintf=http',
+                '--http-host=127.0.0.1',
+                `--http-port=${currentVlcHttpPort}`,
+                `--http-password=${currentVlcHttpPassword}`,
             ]
             if (startPosition && startPosition > 0) {
                 args.push(`--start-time=${startPosition}`)
@@ -328,17 +255,21 @@ export function launchPlayer(
             args.push(filePath)
             currentPlayer = spawn('vlc', args, { detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
         }
+
         const launchedPlayer = currentPlayer
 
         if (type === 'vlc' && currentPlayer) {
-            if (currentVlcTelnetPort) {
-                connectToVlcRcSocket(currentVlcTelnetPort, launchedPlayer)
-            }
             currentPlayer.stdout?.on('data', (chunk: Buffer) => {
-                consumePlayerOutput(chunk.toString('utf8'))
+                const text = chunk.toString('utf8').trim()
+                if (text) {
+                    console.log(`[PlaybackDebug][vlc-stdout] ${text}`)
+                }
             })
             currentPlayer.stderr?.on('data', (chunk: Buffer) => {
-                consumePlayerOutput(chunk.toString('utf8'))
+                const text = chunk.toString('utf8').trim()
+                if (text) {
+                    console.log(`[PlaybackDebug][vlc-stderr] ${text}`)
+                }
             })
         }
 
@@ -354,23 +285,18 @@ export function launchPlayer(
                     }
                     console.log('Minimizing app and pushing VLC to front...')
 
-                    // Minimize the main Electron window to get it out of the way
                     if (mainWindow) {
                         try {
-                            mainWindow.setAlwaysOnTop(false) // Temporarily disable always-on-top
+                            mainWindow.setAlwaysOnTop(false)
                             mainWindow.minimize()
                         } catch (err) {
                             console.warn('Failed to minimize window:', err)
                         }
                     }
 
-                    // Push VLC to front using multiple methods
                     const focusCommands = [
-                        // Try wmctrl first (most reliable)
                         'wmctrl -a "VLC" 2>/dev/null',
-                        // Try xdotool with window class
                         'xdotool search --class "vlc" windowactivate --sync windowraise 2>/dev/null',
-                        // Try xdotool with window name
                         'xdotool search --name "vlc" windowactivate --sync windowraise 2>/dev/null',
                     ]
 
@@ -385,7 +311,7 @@ export function launchPlayer(
                 } catch (err) {
                     console.warn('Failed to push VLC to front:', err)
                 }
-            }, 600) // Wait 600ms for VLC to fully initialize
+            }, 600)
         }
 
         // Report playback start to Jellyfin
@@ -409,11 +335,11 @@ export function launchPlayer(
             console.error(`Failed to launch ${type}:`, err.message)
             clearProgressInterval()
             resetPlaybackState()
-            // Restore Electron window if player failed to start
+
             if (mainWindow && mainWindow.isMinimized()) {
                 mainWindow.restore()
                 mainWindow.focus()
-                mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
+                mainWindow.setAlwaysOnTop(true)
             }
         })
 
@@ -448,24 +374,22 @@ export function launchPlayer(
                 }
             })()
 
-            // Restore Electron window when player closes
             if (mainWindow && mainWindow.isMinimized()) {
                 mainWindow.restore()
                 mainWindow.focus()
             }
             if (mainWindow) {
-                mainWindow.setAlwaysOnTop(true) // Re-enable always-on-top
+                mainWindow.setAlwaysOnTop(true)
             }
 
             resetPlaybackState()
         })
 
-        // Unref so the player doesn't prevent Electron from closing
         currentPlayer.unref()
 
         return { success: true }
     } catch (err: any) {
-        clearVlcRcSocket()
+        clearVlcState()
         return { success: false, error: err.message || `Failed to launch ${type}` }
     }
 }
@@ -477,7 +401,7 @@ export async function stopPlayer(): Promise<void> {
         console.log(
             `[PlaybackDebug] stopPlayer called item=${currentItemId || 'none'} startSec=${playbackStartPositionSec} durationSec=${currentDurationSec || 0}`
         )
-        await requestVlcTimeSnapshot()
+        await requestVlcStatusSnapshot()
         currentPlayer?.kill()
     }
 }
