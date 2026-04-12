@@ -147,6 +147,7 @@ async function requestVlcTimeSnapshot(timeoutMs = 200): Promise<void> {
     const before = lastKnownPositionSec
 
     try {
+        socket.write('status\n')
         socket.write('get_time\n')
     } catch {
         return
@@ -182,7 +183,7 @@ function consumePlayerOutput(chunk: string) {
             continue
         }
 
-        const timeMatch = line.match(/time:\s*(\d+(?:\.\d+)?)s/i)
+        const timeMatch = line.match(/time:\s*(\d+(?:\.\d+)?)(?:s)?/i)
         if (timeMatch?.[1]) {
             updateLivePosition(Number(timeMatch[1]))
             continue
