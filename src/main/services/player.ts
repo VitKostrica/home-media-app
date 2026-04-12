@@ -217,8 +217,9 @@ function getEstimatedPositionTicks(): number {
 }
 
 function getBestKnownPositionTicks(): number {
-    if (currentPlayerType === 'vlc' && hasVlcLivePosition) {
-        return lastKnownPositionSec * 10000000
+    if (currentPlayerType === 'vlc') {
+        const vlcSec = hasVlcLivePosition ? lastKnownPositionSec : playbackStartPositionSec
+        return Math.max(0, vlcSec) * 10000000
     }
 
     const estimatedSec = Math.floor(getEstimatedPositionTicks() / 10000000)
@@ -418,7 +419,9 @@ export function launchPlayer(
             jellyfinService.reportPlaybackStart(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
                 console.error('[PlaybackDebug] reportPlaybackStart failed:', err?.message || err)
             })
-            startProgressReporting()
+            if (type === 'mpv') {
+                startProgressReporting()
+            }
         } else {
             console.warn('[PlaybackDebug] Missing jellyfin item id, progress/stopped will not be reported')
         }
