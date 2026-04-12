@@ -1,9 +1,7 @@
 import { spawn, ChildProcess } from 'child_process'
 import { BrowserWindow } from 'electron'
-import fs from 'fs'
 import * as jellyfinService from './jellyfin'
 import net from 'net'
-import os from 'os'
 import path from 'path'
 
 type PlayerType = 'mpv' | 'vlc'
@@ -19,12 +17,10 @@ let currentPlaySessionId = ''
 let lastKnownPositionSec = 0
 let currentPlayerType: PlayerType | null = null
 let hasVlcLivePosition = false
-let isVlcPaused = false
-let playbackPausedAtMs = 0
-let playbackPausedTotalMs = 0
 let vlcOutputBuffer = ''
 let currentVlcRcSocket: net.Socket | null = null
-let currentVlcRcSocketPath = ''
+let currentVlcTelnetPort = 0
+let currentVlcTelnetPassword = ''
 const COMPLETE_THRESHOLD_RATIO = 0.9
 const FORCED_STOP_CAP_RATIO = 0.85
 const PROGRESS_POLL_INTERVAL_MS = 1000
@@ -45,14 +41,8 @@ function clearVlcRcSocket() {
         currentVlcRcSocket.destroy()
         currentVlcRcSocket = null
     }
-    if (currentVlcRcSocketPath) {
-        try {
-            fs.rmSync(currentVlcRcSocketPath, { force: true })
-        } catch {
-            // Ignore cleanup errors for the temporary VLC socket path.
-        }
-        currentVlcRcSocketPath = ''
-    }
+    currentVlcTelnetPort = 0
+    currentVlcTelnetPassword = ''
 }
 
 function resetPlaybackState() {
@@ -67,9 +57,6 @@ function resetPlaybackState() {
     lastKnownPositionSec = 0
     currentPlayerType = null
     hasVlcLivePosition = false
-    isVlcPaused = false
-    playbackPausedAtMs = 0
-    playbackPausedTotalMs = 0
     vlcOutputBuffer = ''
 }
 
@@ -91,9 +78,7 @@ function getPlaybackElapsedMs(): number {
         return 0
     }
 
-    const now = Date.now()
-    const pausedMs = playbackPausedAtMs ? now - playbackPausedAtMs : 0
-    return Math.max(0, now - playbackStartedAtMs - playbackPausedTotalMs - pausedMs)
+    return Math.max(0, Date.now() - playbackStartedAtMs)
 }
 
 function reportCurrentPlaybackProgress(forcePausedOverride?: boolean) {
@@ -102,40 +87,12 @@ function reportCurrentPlaybackProgress(forcePausedOverride?: boolean) {
     }
 
     const ticks = getBestKnownPositionTicks()
-    const paused = typeof forcePausedOverride === 'boolean' ? forcePausedOverride : isVlcPaused
     console.log(
-        `[PlaybackDebug] reportCurrentProgress item=${currentItemId} sec=${ticksToSec(ticks)} ticks=${ticks} paused=${paused ? 'yes' : 'no'}`
+        `[PlaybackDebug] reportCurrentProgress item=${currentItemId} sec=${ticksToSec(ticks)} ticks=${ticks}`
     )
-    jellyfinService.reportProgress(currentItemId, ticks, currentPlaySessionId, paused).catch((err) => {
+    jellyfinService.reportProgress(currentItemId, ticks, currentPlaySessionId, forcePausedOverride === true).catch((err) => {
         console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
     })
-}
-
-function setVlcPaused(nextPaused: boolean) {
-    if (currentPlayerType !== 'vlc' || isVlcPaused === nextPaused) {
-        return
-    }
-
-    if (nextPaused) {
-        playbackPausedAtMs = Date.now()
-        isVlcPaused = true
-        console.log(
-            `[PlaybackDebug] VLC paused item=${currentItemId || 'none'} sec=${ticksToSec(getBestKnownPositionTicks())} pausedAtMs=${playbackPausedAtMs}`
-        )
-    } else {
-        if (playbackPausedAtMs) {
-            playbackPausedTotalMs += Date.now() - playbackPausedAtMs
-        }
-        playbackPausedAtMs = 0
-        isVlcPaused = false
-        console.log(
-            `[PlaybackDebug] VLC resumed item=${currentItemId || 'none'} sec=${ticksToSec(getBestKnownPositionTicks())} pausedTotalMs=${playbackPausedTotalMs}`
-        )
-    }
-
-    if (currentItemId) {
-        reportCurrentPlaybackProgress()
-    }
 }
 
 async function requestVlcTimeSnapshot(timeoutMs = 200): Promise<void> {
@@ -147,7 +104,6 @@ async function requestVlcTimeSnapshot(timeoutMs = 200): Promise<void> {
     const before = lastKnownPositionSec
 
     try {
-        socket.write('status\n')
         socket.write('get_time\n')
     } catch {
         return
@@ -157,7 +113,7 @@ async function requestVlcTimeSnapshot(timeoutMs = 200): Promise<void> {
 
     if (lastKnownPositionSec !== before) {
         console.log(
-            `[PlaybackDebug] VLC snapshot item=${currentItemId || 'none'} sec=${lastKnownPositionSec} paused=${isVlcPaused ? 'yes' : 'no'}`
+            `[PlaybackDebug] VLC snapshot item=${currentItemId || 'none'} sec=${lastKnownPositionSec}`
         )
     }
 }
@@ -170,16 +126,6 @@ function consumePlayerOutput(chunk: string) {
     for (const rawLine of lines) {
         const line = rawLine.trim()
         if (!line) {
-            continue
-        }
-
-        if (/status change:\s*\(\s*pause\b/i.test(line)) {
-            setVlcPaused(true)
-            continue
-        }
-
-        if (/status change:\s*\(\s*play\b/i.test(line)) {
-            setVlcPaused(false)
             continue
         }
 
@@ -196,12 +142,12 @@ function consumePlayerOutput(chunk: string) {
     }
 }
 
-function connectToVlcRcSocket(socketPath: string, launchedPlayer: ChildProcess, attempt = 0) {
-    if (currentPlayer !== launchedPlayer || !socketPath) {
+function connectToVlcRcSocket(port: number, launchedPlayer: ChildProcess, attempt = 0) {
+    if (currentPlayer !== launchedPlayer || !port) {
         return
     }
 
-    const socket = net.createConnection({ path: socketPath })
+    const socket = net.createConnection({ host: '127.0.0.1', port })
 
     socket.setEncoding('utf8')
     socket.on('data', (chunk: string) => {
@@ -215,6 +161,18 @@ function connectToVlcRcSocket(socketPath: string, launchedPlayer: ChildProcess, 
             return
         }
         currentVlcRcSocket = socket
+        if (currentVlcTelnetPassword) {
+            socket.write(`${currentVlcTelnetPassword}\n`)
+        }
+        setTimeout(() => {
+            if (currentPlayer === launchedPlayer && currentVlcRcSocket === socket && !socket.destroyed) {
+                try {
+                    socket.write('get_time\n')
+                } catch {
+                    // Ignore initial telnet query failure; the periodic poll will retry.
+                }
+            }
+        }, 200)
     })
     socket.on('error', (err) => {
         socket.destroy()
@@ -223,7 +181,7 @@ function connectToVlcRcSocket(socketPath: string, launchedPlayer: ChildProcess, 
         }
 
         if (attempt < 20) {
-            setTimeout(() => connectToVlcRcSocket(socketPath, launchedPlayer, attempt + 1), 100)
+            setTimeout(() => connectToVlcRcSocket(port, launchedPlayer, attempt + 1), 100)
             return
         }
 
@@ -302,7 +260,7 @@ function startProgressReporting() {
             await requestVlcTimeSnapshot(300)
         }
         console.log(
-            `[PlaybackDebug] progress tick item=${currentItemId || 'none'} paused=${isVlcPaused ? 'yes' : 'no'} elapsedMs=${getPlaybackElapsedMs()} liveSec=${ticksToSec(getBestKnownPositionTicks())}`
+            `[PlaybackDebug] progress tick item=${currentItemId || 'none'} elapsedMs=${getPlaybackElapsedMs()} liveSec=${ticksToSec(getBestKnownPositionTicks())}`
         )
         reportCurrentPlaybackProgress()
     }, PROGRESS_POLL_INTERVAL_MS)
@@ -336,9 +294,6 @@ export function launchPlayer(
     currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     lastKnownPositionSec = startPosition && startPosition > 0 ? startPosition : 0
     hasVlcLivePosition = false
-    isVlcPaused = false
-    playbackPausedAtMs = 0
-    playbackPausedTotalMs = 0
     vlcOutputBuffer = ''
     console.log(
         `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} playSessionId=${currentPlaySessionId} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
@@ -355,24 +310,17 @@ export function launchPlayer(
             args.push(filePath)
             currentPlayer = spawn('mpv', args, { detached: true, stdio: 'ignore' })
         } else {
-            // VLC - enable the oldrc interface and emit position updates
-            // so we can track pause/resume state without wall-clock drift.
-            // Use a local Unix socket so RC mode does not depend on stdin/tty state.
-            currentVlcRcSocketPath = path.join(
-                os.tmpdir(),
-                `home-media-app-vlc-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.sock`
-            )
-            try {
-                fs.rmSync(currentVlcRcSocketPath, { force: true })
-            } catch {
-                // Ignore cleanup errors before reusing the socket path.
-            }
+            // VLC - use the telnet interface so we can query the current time
+            // directly instead of estimating with wall-clock drift.
+            currentVlcTelnetPort = 4200 + Math.floor(Math.random() * 2000)
+            currentVlcTelnetPassword = Math.random().toString(36).slice(2, 12)
 
             args = [
                 '--fullscreen',
-                '--extraintf=oldrc',
-                `--rc-unix=${currentVlcRcSocketPath}`,
-                '--rc-show-pos',
+                '--extraintf=telnet',
+                '--telnet-host=127.0.0.1',
+                `--telnet-port=${currentVlcTelnetPort}`,
+                `--telnet-password=${currentVlcTelnetPassword}`,
             ]
             if (startPosition && startPosition > 0) {
                 args.push(`--start-time=${startPosition}`)
@@ -383,8 +331,8 @@ export function launchPlayer(
         const launchedPlayer = currentPlayer
 
         if (type === 'vlc' && currentPlayer) {
-            if (currentVlcRcSocketPath) {
-                connectToVlcRcSocket(currentVlcRcSocketPath, launchedPlayer)
+            if (currentVlcTelnetPort) {
+                connectToVlcRcSocket(currentVlcTelnetPort, launchedPlayer)
             }
             currentPlayer.stdout?.on('data', (chunk: Buffer) => {
                 consumePlayerOutput(chunk.toString('utf8'))
