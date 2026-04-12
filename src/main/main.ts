@@ -25,11 +25,14 @@ function toGlobalShortcutAccelerator(key: string): string | null {
     if (normalized === 'backspace') {
         return 'BackSpace'
     }
-    if (normalized === 'browserback') {
-        return 'BrowserBack'
-    }
     if (normalized === 'escape' || normalized === 'esc') {
         return 'Escape'
+    }
+
+    // Electron does not support BrowserBack as a globalShortcut accelerator.
+    // Keep it for renderer-side matching, but do not try to register it globally.
+    if (normalized === 'browserback') {
+        return null
     }
 
     return key.trim()
@@ -46,21 +49,31 @@ function registerBackShortcuts() {
     for (const key of backKeys) {
         const accelerator = toGlobalShortcutAccelerator(key)
         if (!accelerator) {
+            if (key.trim().toLowerCase() === 'browserback') {
+                console.warn(
+                    'BrowserBack is not supported as a global shortcut accelerator in Electron. ' +
+                        'Use Backspace, Escape, or another supported key for VLC control.'
+                )
+            }
             continue
         }
 
-        const registered = globalShortcut.register(accelerator, () => {
-            console.log(`${accelerator} pressed - stopping player`)
-            playerService.stopPlayer()
+        try {
+            const registered = globalShortcut.register(accelerator, () => {
+                console.log(`${accelerator} pressed - stopping player`)
+                playerService.stopPlayer()
 
-            if (mainWindow && mainWindow.isMinimized()) {
-                mainWindow.restore()
-                mainWindow.focus()
+                if (mainWindow && mainWindow.isMinimized()) {
+                    mainWindow.restore()
+                    mainWindow.focus()
+                }
+            })
+
+            if (!registered) {
+                console.warn(`Failed to register global shortcut: ${accelerator}`)
             }
-        })
-
-        if (!registered) {
-            console.warn(`Failed to register global shortcut: ${accelerator}`)
+        } catch (err) {
+            console.warn(`Failed to register global shortcut ${accelerator}:`, (err as Error)?.message || err)
         }
     }
 }
