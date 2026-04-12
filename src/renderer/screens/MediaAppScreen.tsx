@@ -64,10 +64,7 @@ function HomeIcon() {
 function ContinueIcon() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="8" />
-            <path d="M12 7v5l3.5 2.1" />
-            <path d="M6.5 8.5A7.5 7.5 0 0 1 12 4.5c2.1 0 4 .9 5.4 2.3" />
-            <path d="M16.2 6.2h1.5v3.5" />
+            <path d="M8 5v14l12-7z" />
         </svg>
     )
 }
@@ -75,11 +72,12 @@ function ContinueIcon() {
 function MoviesIcon() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="5" width="16" height="14" rx="2" />
-            <path d="M8 5v14" />
-            <path d="M16 5v14" />
-            <path d="M4 9h16" />
-            <path d="M4 13h16" />
+            <rect x="4" y="7" width="16" height="10" rx="2" />
+            <path d="M8 7l-2 4" />
+            <path d="M12 7l-2 4" />
+            <path d="M16 7l-2 4" />
+            <path d="M20 7l-2 4" />
+            <path d="M4 11h16" />
         </svg>
     )
 }
@@ -87,10 +85,11 @@ function MoviesIcon() {
 function ShowsIcon() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="4" y="6" width="16" height="11" rx="2" />
-            <path d="M9 20h6" />
-            <path d="M12 17v3" />
-            <path d="M9.5 9.5h5" />
+            <rect x="4" y="6" width="16" height="10" rx="2" />
+            <path d="M8 18h8" />
+            <path d="M12 16v2" />
+            <path d="M9 10h6" />
+            <path d="M7 6.5h10" />
         </svg>
     )
 }
@@ -669,7 +668,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                             <div className="section-header">
                                                 <h2 className="section-title">
                                                     <span className="section-title-icon" aria-hidden="true">
-                                                        <ContinueIcon />
+                                                        <PlayIcon />
                                                     </span>
                                                     Continue Watching
                                                 </h2>
