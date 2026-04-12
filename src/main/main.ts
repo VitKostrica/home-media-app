@@ -178,8 +178,8 @@ ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, posit
     await jellyfinService.reportPlaybackStart(itemId, positionTicks)
 })
 
-ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportProgress(itemId, positionTicks)
+ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTicks: number, isPaused?: boolean) => {
+    await jellyfinService.reportProgress(itemId, positionTicks, undefined, isPaused)
 })
 
 ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTicks: number) => {

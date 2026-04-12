@@ -24,7 +24,7 @@ declare global {
                 getNextUpItems: () => Promise<any>
                 getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
                 reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
-                reportProgress: (itemId: string, positionTicks: number) => Promise<void>
+                reportProgress: (itemId: string, positionTicks: number, isPaused?: boolean) => Promise<void>
                 reportStopped: (itemId: string, positionTicks: number) => Promise<void>
             }
             configApi: {

@@ -27,8 +27,8 @@ contextBridge.exposeInMainWorld('electron', {
         getNextUpItems: () => ipcRenderer.invoke('jellyfin:get-next-up-items'),
         getPlaybackInfo: (itemId: string) => ipcRenderer.invoke('jellyfin:get-playback-info', itemId),
         reportPlaybackStart: (itemId: string, positionTicks: number) => ipcRenderer.invoke('jellyfin:report-playback-start', itemId, positionTicks),
-        reportProgress: (itemId: string, positionTicks: number) =>
-            ipcRenderer.invoke('jellyfin:report-progress', itemId, positionTicks),
+        reportProgress: (itemId: string, positionTicks: number, isPaused?: boolean) =>
+            ipcRenderer.invoke('jellyfin:report-progress', itemId, positionTicks, isPaused),
         reportStopped: (itemId: string, positionTicks: number) =>
             ipcRenderer.invoke('jellyfin:report-stopped', itemId, positionTicks),
     },

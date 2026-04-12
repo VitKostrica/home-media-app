@@ -19,6 +19,9 @@ let currentPlaySessionId = ''
 let lastKnownPositionSec = 0
 let currentPlayerType: PlayerType | null = null
 let hasVlcLivePosition = false
+let isVlcPaused = false
+let playbackPausedAtMs = 0
+let playbackPausedTotalMs = 0
 let vlcOutputBuffer = ''
 let currentVlcRcSocket: net.Socket | null = null
 let currentVlcRcSocketPath = ''
@@ -63,6 +66,9 @@ function resetPlaybackState() {
     lastKnownPositionSec = 0
     currentPlayerType = null
     hasVlcLivePosition = false
+    isVlcPaused = false
+    playbackPausedAtMs = 0
+    playbackPausedTotalMs = 0
     vlcOutputBuffer = ''
 }
 
@@ -75,6 +81,58 @@ function updateLivePosition(positionSec: number) {
     hasVlcLivePosition = true
 }
 
+function getPlaybackElapsedMs(): number {
+    if (!playbackStartedAtMs) {
+        return 0
+    }
+
+    const now = Date.now()
+    const pausedMs = playbackPausedAtMs ? now - playbackPausedAtMs : 0
+    return Math.max(0, now - playbackStartedAtMs - playbackPausedTotalMs - pausedMs)
+}
+
+function reportCurrentPlaybackProgress(forcePausedOverride?: boolean) {
+    if (!currentItemId) {
+        return
+    }
+
+    const ticks = getBestKnownPositionTicks()
+    const paused = typeof forcePausedOverride === 'boolean' ? forcePausedOverride : isVlcPaused
+    console.log(
+        `[PlaybackDebug] reportCurrentProgress item=${currentItemId} sec=${ticksToSec(ticks)} ticks=${ticks} paused=${paused ? 'yes' : 'no'}`
+    )
+    jellyfinService.reportProgress(currentItemId, ticks, currentPlaySessionId, paused).catch((err) => {
+        console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
+    })
+}
+
+function setVlcPaused(nextPaused: boolean) {
+    if (currentPlayerType !== 'vlc' || isVlcPaused === nextPaused) {
+        return
+    }
+
+    if (nextPaused) {
+        playbackPausedAtMs = Date.now()
+        isVlcPaused = true
+        console.log(
+            `[PlaybackDebug] VLC paused item=${currentItemId || 'none'} sec=${ticksToSec(getBestKnownPositionTicks())} pausedAtMs=${playbackPausedAtMs}`
+        )
+    } else {
+        if (playbackPausedAtMs) {
+            playbackPausedTotalMs += Date.now() - playbackPausedAtMs
+        }
+        playbackPausedAtMs = 0
+        isVlcPaused = false
+        console.log(
+            `[PlaybackDebug] VLC resumed item=${currentItemId || 'none'} sec=${ticksToSec(getBestKnownPositionTicks())} pausedTotalMs=${playbackPausedTotalMs}`
+        )
+    }
+
+    if (currentItemId) {
+        reportCurrentPlaybackProgress()
+    }
+}
+
 function consumePlayerOutput(chunk: string) {
     vlcOutputBuffer += chunk
     const lines = vlcOutputBuffer.split(/\r?\n/)
@@ -83,6 +141,16 @@ function consumePlayerOutput(chunk: string) {
     for (const rawLine of lines) {
         const line = rawLine.trim()
         if (!line) {
+            continue
+        }
+
+        if (/status change:\s*\(\s*pause\b/i.test(line)) {
+            setVlcPaused(true)
+            continue
+        }
+
+        if (/status change:\s*\(\s*play\b/i.test(line)) {
+            setVlcPaused(false)
             continue
         }
 
@@ -140,10 +208,11 @@ function connectToVlcRcSocket(socketPath: string, launchedPlayer: ChildProcess, 
 }
 
 function getEstimatedPositionTicks(): number {
+    const elapsedMs = getPlaybackElapsedMs()
     if (!playbackStartedAtMs) {
         return playbackStartPositionSec * 10000000
     }
-    const elapsedSec = Math.max(0, Math.floor((Date.now() - playbackStartedAtMs) / 1000))
+    const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000))
     return (playbackStartPositionSec + elapsedSec) * 10000000
 }
 
@@ -185,20 +254,24 @@ function didFinishPlayback(positionTicks: number): boolean {
 }
 
 async function refreshVlcPositionIfPossible(): Promise<void> {
-    // VLC position is updated from the player output stream when RC reporting is available.
-    // Keep this hook for the periodic reporter and future player integrations.
+    if (currentPlayerType === 'vlc' && currentVlcRcSocket && !currentVlcRcSocket.destroyed) {
+        try {
+            currentVlcRcSocket.write('status\n')
+        } catch {
+            // Ignore transient RC write failures and fall back to the cached playback state.
+        }
+    }
     return
 }
 
-function startProgressReporting(itemId: string) {
+function startProgressReporting() {
     clearProgressInterval()
     progressInterval = setInterval(async () => {
         await refreshVlcPositionIfPossible()
-        const ticks = getBestKnownPositionTicks()
-        console.log(`[PlaybackDebug] Progress tick item=${itemId} sec=${ticksToSec(ticks)} ticks=${ticks}`)
-        jellyfinService.reportProgress(itemId, ticks, currentPlaySessionId).catch((err) => {
-            console.error('[PlaybackDebug] reportProgress failed:', err?.message || err)
-        })
+        console.log(
+            `[PlaybackDebug] progress tick item=${currentItemId || 'none'} paused=${isVlcPaused ? 'yes' : 'no'} elapsedMs=${getPlaybackElapsedMs()} liveSec=${ticksToSec(getBestKnownPositionTicks())}`
+        )
+        reportCurrentPlaybackProgress()
     }, 10000)
 }
 
@@ -230,6 +303,9 @@ export function launchPlayer(
     currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     lastKnownPositionSec = startPosition && startPosition > 0 ? startPosition : 0
     hasVlcLivePosition = false
+    isVlcPaused = false
+    playbackPausedAtMs = 0
+    playbackPausedTotalMs = 0
     vlcOutputBuffer = ''
     console.log(
         `[PlaybackDebug] Launch requested type=${type} item=${currentItemId || 'none'} playSessionId=${currentPlaySessionId} startSec=${startPosition || 0} durationSec=${currentDurationSec || 0} file=${path.basename(filePath)}`
@@ -342,7 +418,7 @@ export function launchPlayer(
             jellyfinService.reportPlaybackStart(currentItemId, positionTicks, currentPlaySessionId).catch((err) => {
                 console.error('[PlaybackDebug] reportPlaybackStart failed:', err?.message || err)
             })
-            startProgressReporting(currentItemId)
+            startProgressReporting()
         } else {
             console.warn('[PlaybackDebug] Missing jellyfin item id, progress/stopped will not be reported')
         }

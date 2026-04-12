@@ -528,7 +528,12 @@ export async function reportPlaybackStart(itemId: string, positionTicks: number 
 }
 
 /** Update Jellyfin with current playback position */
-export async function reportProgress(itemId: string, positionTicks: number, playSessionId?: string): Promise<void> {
+export async function reportProgress(
+    itemId: string,
+    positionTicks: number,
+    playSessionId?: string,
+    isPaused: boolean = false
+): Promise<void> {
     if (!ensureAuth()) return
 
     try {
@@ -542,7 +547,7 @@ export async function reportProgress(itemId: string, positionTicks: number, play
             {
                 ItemId: normalizedItemId,
                 PositionTicks: positionTicks,
-                IsPaused: false,
+                IsPaused: isPaused,
                 ...(playSessionId ? { PlaySessionId: playSessionId } : {}),
             },
             { headers: getHeaders() }
