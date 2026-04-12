@@ -27,6 +27,31 @@
     z-index: 2;
 }
 
+.media-card.compact .media-card-poster {
+    aspect-ratio: 16 / 9;
+}
+
+.media-card.compact .media-card-info {
+    padding: 8px 9px 7px;
+    gap: 2px;
+}
+
+.media-card.compact .media-card-title {
+    font-size: 0.82rem;
+}
+
+.media-card.compact .media-card-subtitle {
+    font-size: 0.68rem;
+}
+
+.media-card.compact .media-card-year {
+    font-size: 0.7rem;
+}
+
+.media-card.compact.focused {
+    transform: scale(1.03);
+}
+
 /* ── Poster ─────────────────────────────────────────────── */
 
 .media-card-poster {
