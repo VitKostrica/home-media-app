@@ -69,7 +69,27 @@ function updateLivePosition(positionSec: number) {
         return
     }
 
-    lastKnownPositionSec = Math.floor(positionSec)
+    const normalized = Math.floor(positionSec)
+    lastKnownPositionSec = Math.max(lastKnownPositionSec, normalized)
+}
+
+function extractVlcPositionSec(data: VlcStatusResponse): number | null {
+    if (typeof data.time === 'number' && Number.isFinite(data.time) && data.time >= 0) {
+        return Math.floor(data.time)
+    }
+
+    if (
+        typeof data.position === 'number' &&
+        Number.isFinite(data.position) &&
+        typeof data.length === 'number' &&
+        Number.isFinite(data.length) &&
+        data.position >= 0 &&
+        data.length > 0
+    ) {
+        return Math.floor(data.position * data.length)
+    }
+
+    return null
 }
 
 function getPlaybackElapsedMs(): number {
@@ -112,8 +132,9 @@ async function requestVlcStatusSnapshot(timeoutMs = 300): Promise<boolean> {
         })
 
         const data = response.data as VlcStatusResponse
-        if (typeof data.time === 'number' && Number.isFinite(data.time)) {
-            updateLivePosition(data.time)
+        const positionSec = extractVlcPositionSec(data)
+        if (positionSec !== null) {
+            updateLivePosition(positionSec)
         }
         if (data.state) {
             currentVlcState = data.state
