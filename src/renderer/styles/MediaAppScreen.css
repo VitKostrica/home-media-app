@@ -168,7 +168,7 @@
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 18px;
+    gap: 20px;
     overflow-y: auto;
     padding-right: 8px;
     align-content: start;
@@ -253,7 +253,7 @@
 .media-grid {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 18px;
+    gap: 20px;
     width: 100%;
     min-height: 0;
     overflow: visible;
@@ -265,9 +265,8 @@
 
 .media-item-wrapper {
     position: relative;
-    width: calc(100% + 12px);
-    margin: 0 -6px;
-    justify-self: center;
+    width: 100%;
+    justify-self: stretch;
     transition:
         transform 180ms ease,
         filter 180ms ease;
