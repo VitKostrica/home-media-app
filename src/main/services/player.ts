@@ -81,6 +81,10 @@ function updateLivePosition(positionSec: number) {
     hasVlcLivePosition = true
 }
 
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function getPlaybackElapsedMs(): number {
     if (!playbackStartedAtMs) {
         return 0
@@ -130,6 +134,29 @@ function setVlcPaused(nextPaused: boolean) {
 
     if (currentItemId) {
         reportCurrentPlaybackProgress()
+    }
+}
+
+async function requestVlcTimeSnapshot(timeoutMs = 200): Promise<void> {
+    if (currentPlayerType !== 'vlc' || !currentVlcRcSocket || currentVlcRcSocket.destroyed) {
+        return
+    }
+
+    const socket = currentVlcRcSocket
+    const before = lastKnownPositionSec
+
+    try {
+        socket.write('get_time\n')
+    } catch {
+        return
+    }
+
+    await wait(timeoutMs)
+
+    if (lastKnownPositionSec !== before) {
+        console.log(
+            `[PlaybackDebug] VLC snapshot item=${currentItemId || 'none'} sec=${lastKnownPositionSec} paused=${isVlcPaused ? 'yes' : 'no'}`
+        )
     }
 }
 
@@ -493,16 +520,13 @@ export function launchPlayer(
 }
 
 /** Kill the current player process if running */
-export function stopPlayer(): void {
+export async function stopPlayer(): Promise<void> {
     if (currentPlayer && !currentPlayer.killed) {
         stopRequestedByUser = true
         console.log(
             `[PlaybackDebug] stopPlayer called item=${currentItemId || 'none'} startSec=${playbackStartPositionSec} durationSec=${currentDurationSec || 0}`
         )
-        refreshVlcPositionIfPossible()
-            .catch(() => { })
-            .finally(() => {
-                currentPlayer?.kill()
-            })
+        await requestVlcTimeSnapshot()
+        currentPlayer?.kill()
     }
 }
