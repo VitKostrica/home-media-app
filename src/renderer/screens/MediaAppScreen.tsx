@@ -28,6 +28,13 @@ interface MediaAppScreenProps {
 }
 
 const COLUMNS = 6
+const CONTINUE_WATCHING_ROW_LIMIT = 6
+const NEXT_UP_ROW_LIMIT = 6
+const NEXT_UP_RETRY_DELAY_MS = 400
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 function formatTime(totalSeconds: number): string {
     const h = Math.floor(totalSeconds / 3600)
@@ -56,6 +63,82 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const { matches } = useKeybindings()
 
     const gridRef = useRef<HTMLDivElement>(null)
+    const skipNextAutoRefreshRef = useRef(false)
+
+    const fetchItems = useCallback(
+        async (tabIndex: number = activeTab, options?: { retryNextUp?: boolean }) => {
+            setLoading(true)
+            setError(null)
+            try {
+                const config = await window.electron?.configApi?.get()
+                if (!config?.jellyfinApiKey || !config?.jellyfinUserId) {
+                    setIsAuthenticated(false)
+                    setItems([])
+                    setLoading(false)
+                    return
+                }
+
+                const api = window.electron?.jellyfinApi
+                if (!api) {
+                    setError('Electron API not available')
+                    setLoading(false)
+                    return
+                }
+
+                let data: MediaItem[] = []
+
+                if (tabIndex === 0) {
+                    // Continue Watching tab: refresh Resume + Next Up each visit
+                    const resumeItems = await api.getResumeItems()
+                    let nextUpItems = await api.getNextUpItems()
+
+                    if (options?.retryNextUp && nextUpItems.length === 0) {
+                        console.log('[Continue Watching] Next Up empty, retrying once after a short delay')
+                        await sleep(NEXT_UP_RETRY_DELAY_MS)
+                        nextUpItems = await api.getNextUpItems()
+                    }
+
+                    console.log(`[Continue Watching] resume=${resumeItems?.length || 0}, nextUp=${nextUpItems?.length || 0}`)
+                    const resumeUnique = (resumeItems || []).filter(
+                        (item) => item?.id && !isEffectivelyFinished(item)
+                    )
+                    const seenIds = new Set<string>(resumeUnique.map((item) => item.id))
+                    const nextUpUnique = (nextUpItems || []).filter(
+                        (item) => item?.id && !seenIds.has(item.id)
+                    )
+                    console.log(
+                        `[Continue Watching] unique resume=${resumeUnique.length}, unique nextUp=${nextUpUnique.length}`
+                    )
+
+                    const continueRow = resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT)
+                    const nextUpRow = nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT)
+
+                    setContinueWatchingItems(continueRow)
+                    setNextUpItems(nextUpRow)
+                    data = [...continueRow, ...nextUpRow]
+                } else if (tabIndex === 1) {
+                    // Movies tab
+                    data = await api.getMovies()
+                    setContinueWatchingItems([])
+                    setNextUpItems([])
+                } else {
+                    // Shows tab
+                    data = await api.getSeries()
+                    setContinueWatchingItems([])
+                    setNextUpItems([])
+                }
+
+                setItems(data || [])
+                setGridIndex(0)
+            } catch (err: unknown) {
+                const message = err instanceof Error ? err.message : 'Failed to load library'
+                setError(message)
+            } finally {
+                setLoading(false)
+            }
+        },
+        [activeTab]
+    )
 
     // Check auth status on mount
     useEffect(() => {
@@ -65,17 +148,24 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     // Fetch items when tab changes or auth status changes
     useEffect(() => {
         if (isAuthenticated) {
-            fetchItems()
+            if (skipNextAutoRefreshRef.current && activeTab === 0) {
+                skipNextAutoRefreshRef.current = false
+                return
+            }
+            void fetchItems(activeTab)
         }
-    }, [activeTab, isAuthenticated])
+    }, [activeTab, isAuthenticated, fetchItems])
 
     // Listen for player stopped event (from global backspace shortcut)
     useEffect(() => {
         const handlePlayerStopped = () => {
             console.log('Player stopped - clearing VLC overlay and refreshing continue watching')
             setVlcPlayingItem(null)
-            setActiveTab(0) // Switch to Continue Watching tab
-            fetchItems() // Reload the continue watching data
+            skipNextAutoRefreshRef.current = true
+            void fetchItems(0, { retryNextUp: true })
+            if (activeTab !== 0) {
+                setActiveTab(0) // Switch to Continue Watching tab
+            }
         }
 
         if (window.electron) {
@@ -87,7 +177,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 window.electron.off?.('player:stopped', handlePlayerStopped)
             }
         }
-    }, [])
+    }, [activeTab, fetchItems])
 
     const checkAuth = async () => {
         try {
@@ -100,81 +190,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             }
         } catch {
             setIsAuthenticated(false)
-            setLoading(false)
-        }
-    }
-
-    const fetchItems = async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const config = await window.electron?.configApi?.get()
-            if (!config?.jellyfinApiKey || !config?.jellyfinUserId) {
-                setIsAuthenticated(false)
-                setItems([])
-                setLoading(false)
-                return
-            }
-
-            const api = window.electron?.jellyfinApi
-            if (!api) {
-                setError('Electron API not available')
-                setLoading(false)
-                return
-            }
-
-            let data: MediaItem[] = []
-
-            if (activeTab === 0) {
-                // Continue Watching tab: refresh Resume + Next Up each visit
-                const [resumeItems, nextUpItems] = await Promise.all([
-                    api.getResumeItems(),
-                    api.getNextUpItems(),
-                ])
-                console.log(
-                    `[Continue Watching] resume=${resumeItems?.length || 0}, nextUp=${nextUpItems?.length || 0}`
-                )
-                const resumeUnique = (resumeItems || []).filter(
-                    (item) => item?.id && !isEffectivelyFinished(item)
-                )
-                const seenIds = new Set<string>(resumeUnique.map((item) => item.id))
-                const nextUpUnique = (nextUpItems || []).filter(
-                    (item) => item?.id && !seenIds.has(item.id)
-                )
-                console.log(
-                    `[Continue Watching] unique resume=${resumeUnique.length}, unique nextUp=${nextUpUnique.length}`
-                )
-
-                // Keep room for Next Up so it is always visible on this tab.
-                const maxItems = 24
-                const minNextUpSlots = nextUpUnique.length > 0 ? Math.min(8, nextUpUnique.length) : 0
-                const resumeSlots = Math.min(resumeUnique.length, maxItems - minNextUpSlots)
-                const nextUpSlots = Math.min(nextUpUnique.length, maxItems - resumeSlots)
-
-                const continueRow = resumeUnique.slice(0, resumeSlots)
-                const nextUpRow = nextUpUnique.slice(0, nextUpSlots)
-
-                setContinueWatchingItems(continueRow)
-                setNextUpItems(nextUpRow)
-                data = [...continueRow, ...nextUpRow]
-            } else if (activeTab === 1) {
-                // Movies tab
-                data = await api.getMovies()
-                setContinueWatchingItems([])
-                setNextUpItems([])
-            } else {
-                // Shows tab
-                data = await api.getSeries()
-                setContinueWatchingItems([])
-                setNextUpItems([])
-            }
-
-            setItems(data || [])
-            setGridIndex(0)
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Failed to load library'
-            setError(message)
-        } finally {
             setLoading(false)
         }
     }
@@ -341,7 +356,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             setActiveTab(tabIndex)
             setGridIndex(0)
         } else if (tabIndex === 0) {
-            fetchItems()
+            void fetchItems(0, { retryNextUp: true })
         }
     }
 
@@ -394,7 +409,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             </div>
 
             {/* Content Area */}
-            <div className="media-content" ref={gridRef}>
+            <div className={`media-content ${activeTab === 0 ? 'continue-watching-view' : ''}`} ref={gridRef}>
                 {/* Loading State */}
                 {loading && (
                     <div className="media-state-message">
@@ -414,7 +429,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         <div className="state-icon">⚠</div>
                         <h2>Something went wrong</h2>
                         <p className="state-hint">{error}</p>
-                        <button className="retry-button" onClick={fetchItems}>
+                        <button className="retry-button" onClick={() => { void fetchItems(activeTab) }}>
                             Retry
                         </button>
                     </div>

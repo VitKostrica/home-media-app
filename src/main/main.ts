@@ -16,6 +16,68 @@ if (process.platform === 'linux') {
 
 let mainWindow: BrowserWindow | null = null
 
+function toGlobalShortcutAccelerator(key: string): string | null {
+    const normalized = key.trim().toLowerCase()
+    if (!normalized) {
+        return null
+    }
+
+    if (normalized === 'backspace') {
+        return 'BackSpace'
+    }
+    if (normalized === 'escape' || normalized === 'esc') {
+        return 'Escape'
+    }
+
+    // Electron does not support BrowserBack as a globalShortcut accelerator.
+    // Keep it for renderer-side matching, but do not try to register it globally.
+    if (normalized === 'browserback') {
+        return null
+    }
+
+    return key.trim()
+}
+
+function registerBackShortcuts() {
+    for (const accelerator of ['BackSpace', 'BrowserBack']) {
+        globalShortcut.unregister(accelerator)
+    }
+
+    const config = configService.getConfig()
+    const backKeys = new Set<string>([...config.keybindings.back, 'BackSpace', 'BrowserBack'])
+
+    for (const key of backKeys) {
+        const accelerator = toGlobalShortcutAccelerator(key)
+        if (!accelerator) {
+            if (key.trim().toLowerCase() === 'browserback') {
+                console.warn(
+                    'BrowserBack is not supported as a global shortcut accelerator in Electron. ' +
+                        'Use Backspace, Escape, or another supported key for VLC control.'
+                )
+            }
+            continue
+        }
+
+        try {
+            const registered = globalShortcut.register(accelerator, () => {
+                console.log(`${accelerator} pressed - stopping player`)
+                playerService.stopPlayer()
+
+                if (mainWindow && mainWindow.isMinimized()) {
+                    mainWindow.restore()
+                    mainWindow.focus()
+                }
+            })
+
+            if (!registered) {
+                console.warn(`Failed to register global shortcut: ${accelerator}`)
+            }
+        } catch (err) {
+            console.warn(`Failed to register global shortcut ${accelerator}:`, (err as Error)?.message || err)
+        }
+    }
+}
+
 // Register custom protocol handler for local media files
 function registerLocalProtocol() {
     protocol.registerFileProtocol('local', (request, callback) => {
@@ -72,17 +134,8 @@ function createWindow() {
         mainWindow.webContents.openDevTools()
     }
 
-    // Register global backspace shortcut to close player even when minimized
-    globalShortcut.register('BackSpace', () => {
-        console.log('Backspace pressed - stopping player')
-        playerService.stopPlayer()
-
-        // Restore app window
-        if (mainWindow && mainWindow.isMinimized()) {
-            mainWindow.restore()
-            mainWindow.focus()
-        }
-    })
+    // Register global back shortcuts so the same action works from VLC and the app.
+    registerBackShortcuts()
 
     mainWindow.on('closed', () => {
         mainWindow = null
@@ -135,6 +188,7 @@ ipcMain.handle('config:get', () => {
 
 ipcMain.handle('config:set', (_, partial: Record<string, any>) => {
     configService.setConfig(partial)
+    registerBackShortcuts()
 })
 
 // ── Jellyfin IPC ─────────────────────────────────────────────
@@ -178,8 +232,8 @@ ipcMain.handle('jellyfin:report-playback-start', async (_, itemId: string, posit
     await jellyfinService.reportPlaybackStart(itemId, positionTicks)
 })
 
-ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTicks: number) => {
-    await jellyfinService.reportProgress(itemId, positionTicks)
+ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTicks: number, isPaused?: boolean) => {
+    await jellyfinService.reportProgress(itemId, positionTicks, undefined, isPaused)
 })
 
 ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTicks: number) => {
