@@ -39,7 +39,7 @@ function toGlobalShortcutAccelerator(key: string): string | null {
 }
 
 function registerBackShortcuts() {
-    for (const accelerator of ['BackSpace', 'BrowserBack']) {
+    for (const accelerator of ['BackSpace']) {
         globalShortcut.unregister(accelerator)
     }
 
