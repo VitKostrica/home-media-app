@@ -31,7 +31,6 @@
     background: rgba(6, 10, 20, 0.72);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(16px);
 }
 
 .sidebar-button {
@@ -280,7 +279,6 @@
 
 .media-item-wrapper.focused {
     transform: scale(1.04);
-    filter: drop-shadow(0 0 22px rgba(66, 165, 245, 0.55));
     z-index: 5;
 }
 

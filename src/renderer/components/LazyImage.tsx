@@ -129,4 +129,4 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
     )
 }
 
-export default LazyImage
+export default React.memo(LazyImage)
