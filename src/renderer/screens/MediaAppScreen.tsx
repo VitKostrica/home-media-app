@@ -1032,18 +1032,26 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     )}
                                 </div>
                             ) : (
-                                <div className="media-grid-view" ref={contentRef}>
-                                    {items.map((item, index) => (
-                                        <MediaCard
-                                            key={item.id}
-                                            item={item}
-                                            isFocused={index === gridIndex}
-                                            onSelect={() => {
-                                                setGridIndex(index)
-                                                openItem(item)
-                                            }}
-                                        />
-                                    ))}
+                                <div className="media-section-wrap" ref={contentRef}>
+                                    <section className="media-section focused">
+                                        <div className="media-grid">
+                                            {items.map((item, index) => (
+                                                <div
+                                                    key={item.id}
+                                                    className={`media-item-wrapper ${index === gridIndex ? 'focused' : ''}`}
+                                                >
+                                                    <MediaCard
+                                                        item={item}
+                                                        isFocused={index === gridIndex}
+                                                        onSelect={() => {
+                                                            setGridIndex(index)
+                                                            openItem(item)
+                                                        }}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
                                 </div>
                             )}
                         </>
