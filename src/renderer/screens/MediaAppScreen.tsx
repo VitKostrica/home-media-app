@@ -24,6 +24,16 @@ interface MediaItem {
     episodeNumber?: number
 }
 
+interface ShowDetailTarget {
+    id: string
+    title: string
+    posterUrl?: string
+    overview?: string
+    year?: number
+    initialSeasonNumber?: number
+    initialEpisodeNumber?: number
+}
+
 interface MediaAppScreenProps {
     onNavigate: (screen: string) => void
 }
@@ -140,6 +150,16 @@ function NextEpisodeIcon() {
     )
 }
 
+function OpenShowIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="14" rx="2" />
+            <path d="M7 9h10" />
+            <path d="M7 13h6" />
+        </svg>
+    )
+}
+
 const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [activeTab, setActiveTab] = useState<ActiveTab>(0)
     const [items, setItems] = useState<MediaItem[]>([])
@@ -161,11 +181,13 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [detailActionIndex, setDetailActionIndex] = useState<number>(0)
     const [episodeNavigation, setEpisodeNavigation] = useState<MediaItem[]>([])
     const [episodeNavigationLoading, setEpisodeNavigationLoading] = useState<boolean>(false)
+    const [showDetailTarget, setShowDetailTarget] = useState<ShowDetailTarget | null>(null)
     const { matches } = useKeybindings()
 
     const contentRef = useRef<HTMLDivElement>(null)
     const skipNextAutoRefreshRef = useRef(false)
     const fetchRequestIdRef = useRef(0)
+    const playbackResolutionRequestRef = useRef(0)
 
     const focusContinueWatching = useCallback((row: ContinueRow = 'continue', index: number = 0) => {
         setActiveTab(0)
@@ -267,6 +289,34 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         },
         []
     )
+
+    const resolvePlayableItem = useCallback(async (item: MediaItem): Promise<MediaItem | null> => {
+        if (item.filePath) {
+            return item
+        }
+
+        const requestId = ++playbackResolutionRequestRef.current
+        const api = window.electron?.jellyfinApi
+        if (!api) {
+            return null
+        }
+
+        const details = await api.getItemDetails(item.id)
+        if (requestId !== playbackResolutionRequestRef.current) {
+            return null
+        }
+
+        if (!details?.filePath) {
+            return details ? { ...item, ...details } : null
+        }
+
+        return {
+            ...item,
+            ...details,
+            filePath: details.filePath,
+            type: item.type,
+        }
+    }, [])
 
     useEffect(() => {
         checkAuth()
@@ -433,23 +483,24 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }
 
     const launchVlc = useCallback(async (item: MediaItem) => {
-        if (!item.filePath) {
+        const playableItem = await resolvePlayableItem(item)
+        if (!playableItem?.filePath) {
             alert('File path not available')
             return
         }
 
-        const startPosition = item.resumePosition ? Math.floor(item.resumePosition / 10000000) : 0
+        const startPosition = playableItem.resumePosition ? Math.floor(playableItem.resumePosition / 10000000) : 0
 
         try {
             const result = await window.electron?.playerApi?.launch(
                 'vlc',
-                item.filePath,
+                playableItem.filePath,
                 startPosition,
-                item.id,
-                item.duration
+                playableItem.id,
+                playableItem.duration
             )
             if (result?.success) {
-                setVlcPlayingItem(item)
+                setVlcPlayingItem(playableItem)
             } else {
                 alert(`Failed to launch VLC: ${result?.error || 'Unknown error'}`)
             }
@@ -457,10 +508,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             const message = err instanceof Error ? err.message : 'Failed to play media'
             alert(`Error: ${message}`)
         }
-    }, [])
+    }, [resolvePlayableItem])
 
     const handlePlay = useCallback(async () => {
-        if (!selectedItem?.filePath) {
+        if (!selectedItem) {
             return
         }
 
@@ -479,6 +530,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     function closeDetailViews() {
         setShowDetail(false)
         setShowShowDetail(false)
+        setShowDetailTarget(null)
         setSelectedItem(null)
         setEpisodeNavigation([])
         setDetailFocus('play')
@@ -492,11 +544,41 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const openItem = useCallback((item: MediaItem) => {
         setSelectedItem(item)
         if (item.type === 'series') {
+            setShowDetailTarget(item)
             setShowShowDetail(true)
         } else {
             setShowDetail(true)
         }
     }, [])
+
+    const openShowDetail = useCallback(() => {
+        if (!selectedItem) {
+            return
+        }
+
+        const target: ShowDetailTarget =
+            selectedItem.type === 'episode' && selectedItem.seriesId
+                ? {
+                      id: selectedItem.seriesId,
+                      title: selectedItem.seriesName || selectedItem.title,
+                      posterUrl: selectedItem.posterUrl,
+                      overview: selectedItem.overview,
+                      year: selectedItem.year,
+                      initialSeasonNumber: selectedItem.seasonNumber,
+                      initialEpisodeNumber: selectedItem.episodeNumber,
+                  }
+                : {
+                      id: selectedItem.id,
+                      title: selectedItem.title,
+                      posterUrl: selectedItem.posterUrl,
+                      overview: selectedItem.overview,
+                      year: selectedItem.year,
+                  }
+
+        setShowDetail(false)
+        setShowDetailTarget(target)
+        setShowShowDetail(true)
+    }, [selectedItem])
 
     const markSelectedAsSeen = useCallback(async () => {
         if (!selectedItem) {
@@ -514,7 +596,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }, [closeDetailViews, refreshCurrentView, selectedItem])
 
     const restartSelectedItem = useCallback(async () => {
-        if (!selectedItem?.filePath) {
+        if (!selectedItem) {
             return
         }
 
@@ -552,7 +634,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const playAdjacentEpisode = useCallback(
         async (direction: 'previous' | 'next') => {
             const target = getAdjacentEpisode(direction)
-            if (!target?.filePath) {
+            if (!target) {
                 return
             }
 
@@ -584,7 +666,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 label: 'Restart',
                 icon: RestartIcon,
                 onSelect: () => { void restartSelectedItem() },
-                disabled: !selectedItem.filePath,
             },
         ]
 
@@ -597,14 +678,20 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     label: 'Previous episode',
                     icon: PreviousEpisodeIcon,
                     onSelect: () => { void playAdjacentEpisode('previous') },
-                    disabled: episodeNavigationLoading || !previousEpisode?.filePath,
+                    disabled: episodeNavigationLoading || !previousEpisode,
                 },
                 {
                     key: 'next-episode',
                     label: 'Next episode',
                     icon: NextEpisodeIcon,
                     onSelect: () => { void playAdjacentEpisode('next') },
-                    disabled: episodeNavigationLoading || !nextEpisode?.filePath,
+                    disabled: episodeNavigationLoading || !nextEpisode,
+                },
+                {
+                    key: 'open-show',
+                    label: 'Open show',
+                    icon: OpenShowIcon,
+                    onSelect: () => { void openShowDetail() },
                 }
             )
         }
@@ -616,6 +703,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         markSelectedAsSeen,
         playAdjacentEpisode,
         restartSelectedItem,
+        openShowDetail,
         selectedItem,
     ])
 
@@ -716,8 +804,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             if (showShowDetail) {
                 if (matches(event.key, 'back')) {
                     event.preventDefault()
-                    setShowShowDetail(false)
-                    setSelectedItem(null)
+                    closeDetailViews()
                 }
                 return
             }
@@ -1176,32 +1263,20 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                 </div>
                             </div>
 
-                            {!selectedItem.filePath && (
-                                <p className="detail-warning">⚠ No local file path found for this item</p>
-                            )}
-
                             <p className="detail-nav-hint">Up/Down switch rows • Left/Right move actions • Back close</p>
                         </div>
                     </div>
                 </div>
             )}
 
-            {showShowDetail && selectedItem && (
+            {showShowDetail && showDetailTarget && (
                 <ShowDetailModal
-                    show={{
-                        id: selectedItem.id,
-                        title: selectedItem.title,
-                        posterUrl: selectedItem.posterUrl,
-                        overview: selectedItem.overview,
-                        year: selectedItem.year,
-                    }}
+                    show={showDetailTarget}
                     onClose={() => {
-                        setShowShowDetail(false)
-                        setSelectedItem(null)
+                        closeDetailViews()
                     }}
                     onPlay={(episode) => {
-                        setShowShowDetail(false)
-                        setSelectedItem(null)
+                        closeDetailViews()
                         void launchVlc({
                             ...episode,
                             type: 'episode',

@@ -367,7 +367,7 @@ export async function getSeasons(seriesId: string): Promise<MappedItem[]> {
         const response = await api.get(`/Shows/${seriesId}/Seasons`, {
             params: {
                 userId,
-                Fields: 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount',
+                Fields: 'Overview,Path,MediaSources,UserData,ImageTags,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,IndexNumber,ParentIndexNumber,ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount',
             },
             headers: getHeaders(),
         })
@@ -391,7 +391,7 @@ export async function getEpisodes(
             params: {
                 seasonId,
                 userId,
-                Fields: 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount,Overview,ImageTags,RunTimeTicks,UserData,IndexNumber,ParentIndexNumber,SeriesName,SeasonName,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
+                Fields: 'Path,MediaSources,ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount,Overview,ImageTags,RunTimeTicks,UserData,IndexNumber,ParentIndexNumber,SeriesName,SeasonName,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
             },
             headers: getHeaders(),
         })

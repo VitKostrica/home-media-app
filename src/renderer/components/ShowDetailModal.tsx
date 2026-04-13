@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import '../styles/ShowDetailModal.css'
 import LazyImage from './LazyImage'
 import { useKeybindings } from '../hooks/useKeybindings'
-import { isEffectivelyFinished } from '../utils/playbackProgress'
 
 interface Episode {
     id: string
@@ -33,12 +32,14 @@ interface ShowDetailModalProps {
         posterUrl?: string
         overview?: string
         year?: number
+        initialSeasonNumber?: number
+        initialEpisodeNumber?: number
     }
     onClose: () => void
-    onPlay: (episode: Episode) => void
+    onPlay: (episode: Episode) => void | Promise<void>
 }
 
-type ViewMode = 'show' | 'episodes'
+type FocusPane = 'seasons' | 'episodes'
 
 function formatDuration(totalSeconds?: number): string {
     if (!totalSeconds || totalSeconds <= 0) {
@@ -47,6 +48,14 @@ function formatDuration(totalSeconds?: number): string {
 
     const minutes = Math.round(totalSeconds / 60)
     return `${minutes}m`
+}
+
+function clampIndex(index: number, length: number): number {
+    if (length <= 0) {
+        return 0
+    }
+
+    return Math.max(0, Math.min(index, length - 1))
 }
 
 function InfoIcon() {
@@ -86,135 +95,233 @@ function MoreIcon() {
 }
 
 const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay }) => {
-    const [viewMode, setViewMode] = useState<ViewMode>('show')
     const [seasons, setSeasons] = useState<Season[]>([])
     const [episodes, setEpisodes] = useState<Episode[]>([])
     const [selectedSeason, setSelectedSeason] = useState<Season | null>(null)
-    const [loading, setLoading] = useState(false)
-    const [selectedIndex, setSelectedIndex] = useState(0)
-    const [columnCount] = useState(6)
-    const [continueWatchingEpisode, setContinueWatchingEpisode] = useState<Episode | null>(null)
+    const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(0)
+    const [selectedEpisodeIndex, setSelectedEpisodeIndex] = useState(0)
+    const [loadingSeasons, setLoadingSeasons] = useState(false)
+    const [loadingEpisodes, setLoadingEpisodes] = useState(false)
+    const [focusPane, setFocusPane] = useState<FocusPane>('seasons')
     const { matches } = useKeybindings()
+    const loadRequestRef = useRef(0)
 
-    // Fetch seasons and find continue watching episode
-    useEffect(() => {
-        fetchSeasons()
-    }, [])
+    const playEpisode = async (episode: Episode) => {
+        try {
+            const api = window.electron?.jellyfinApi
+            let playable = episode
 
-    useEffect(() => {
-        if (viewMode !== 'episodes') {
-            return
-        }
-
-        const focused = document.querySelector('.episode-card.focused')
-        if (focused instanceof HTMLElement) {
-            focused.scrollIntoView({ behavior: 'auto', block: 'nearest' })
-        }
-    }, [selectedIndex, viewMode])
-
-    const findContinueWatchingEpisode = async (seasonsList: Season[]) => {
-        // Try to find an episode with resume position
-        for (const season of seasonsList) {
-            try {
-                const eps = await window.electron.jellyfinApi.getEpisodes(show.id, season.id)
-                // Find first episode with resume position or first unwatched
-                const resumeEp = eps.find(
-                    (e: Episode) => e.resumePosition && e.resumePosition > 0 && !isEffectivelyFinished(e)
-                )
-                if (resumeEp) {
-                    setContinueWatchingEpisode(resumeEp)
-                    return
+            if (!playable.filePath && api) {
+                const details = await api.getItemDetails(episode.id)
+                if (details) {
+                    playable = {
+                        ...episode,
+                        ...details,
+                    }
                 }
-                const unwatchedEp = eps.find((e: Episode) => !e.watched)
-                if (unwatchedEp) {
-                    setContinueWatchingEpisode(unwatchedEp)
-                    return
-                }
-            } catch (err) {
-                console.error('Failed to fetch episodes for season:', season.id, err)
             }
+
+            if (!playable.filePath) {
+                alert('File path not available')
+                return
+            }
+
+            await onPlay(playable)
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to play episode'
+            alert(`Error: ${message}`)
         }
     }
 
-    const fetchSeasons = async () => {
-        try {
-            setLoading(true)
-            const response = await window.electron.jellyfinApi.getSeasons(show.id)
-            setSeasons(response)
-            await findContinueWatchingEpisode(response)
-        } catch (err) {
-            console.error('Failed to fetch seasons:', err)
-        } finally {
-            setLoading(false)
-        }
-    }
+    const loadSeason = async (
+        season: Season,
+        seasonIndex: number,
+        options?: { focusPane?: FocusPane; episodeNumber?: number }
+    ) => {
+        const requestId = ++loadRequestRef.current
+        setLoadingEpisodes(true)
+        setSelectedSeasonIndex(seasonIndex)
+        setSelectedSeason(season)
+        setSelectedEpisodeIndex(0)
+        setEpisodes([])
 
-    const handleSeasonSelect = async (season: Season) => {
         try {
-            setLoading(true)
             const [seasonDetails, episodeResponse] = await Promise.all([
                 window.electron.jellyfinApi.getItemDetails(season.id),
                 window.electron.jellyfinApi.getEpisodes(show.id, season.id),
             ])
 
-            setSelectedSeason({
+            if (requestId !== loadRequestRef.current) {
+                return
+            }
+
+            const nextSeason: Season = {
                 ...season,
                 title: seasonDetails?.title || season.title,
                 overview: seasonDetails?.overview ?? season.overview,
                 seasonNumber: seasonDetails?.seasonNumber ?? season.seasonNumber,
                 posterUrl: seasonDetails?.posterUrl ?? season.posterUrl,
-            })
+            }
+
+            const targetEpisodeIndex = options?.episodeNumber !== undefined
+                ? episodeResponse.findIndex((episode) => episode.episodeNumber === options.episodeNumber)
+                : 0
+
+            setSelectedSeason(nextSeason)
+            setSelectedSeasonIndex(seasonIndex)
             setEpisodes(episodeResponse)
-            setSelectedIndex(0)
-            setViewMode('episodes')
+            setSelectedEpisodeIndex(clampIndex(targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0, episodeResponse.length))
+
+            if (options?.focusPane) {
+                setFocusPane(options.focusPane)
+            }
         } catch (err) {
             console.error('Failed to fetch season details:', err)
         } finally {
-            setLoading(false)
+            if (requestId === loadRequestRef.current) {
+                setLoadingEpisodes(false)
+            }
         }
+    }
+
+    useEffect(() => {
+        let cancelled = false
+
+        const fetchSeasons = async () => {
+            try {
+                setLoadingSeasons(true)
+                const response = await window.electron.jellyfinApi.getSeasons(show.id)
+
+                if (cancelled) {
+                    return
+                }
+
+                setSeasons(response)
+
+                if (response.length === 0) {
+                    setSelectedSeason(null)
+                    setEpisodes([])
+                    setSelectedSeasonIndex(0)
+                    setSelectedEpisodeIndex(0)
+                    return
+                }
+
+                const preferredSeasonIndex = show.initialSeasonNumber !== undefined
+                    ? response.findIndex((season) => season.seasonNumber === show.initialSeasonNumber)
+                    : 0
+                const safeSeasonIndex = preferredSeasonIndex >= 0 ? preferredSeasonIndex : 0
+                const preferredSeason = response[safeSeasonIndex]
+
+                await loadSeason(preferredSeason, safeSeasonIndex, {
+                    focusPane: show.initialSeasonNumber !== undefined ? 'episodes' : 'seasons',
+                    episodeNumber: show.initialEpisodeNumber,
+                })
+            } catch (err) {
+                console.error('Failed to fetch seasons:', err)
+            } finally {
+                if (!cancelled) {
+                    setLoadingSeasons(false)
+                }
+            }
+        }
+
+        void fetchSeasons()
+
+        return () => {
+            cancelled = true
+            loadRequestRef.current += 1
+        }
+    }, [loadSeason, show.id, show.initialEpisodeNumber, show.initialSeasonNumber])
+
+    useEffect(() => {
+        const focusedSelector = focusPane === 'seasons' ? '.season-card.focused' : '.episode-card.focused'
+        const focused = document.querySelector(focusedSelector)
+        if (focused instanceof HTMLElement) {
+            focused.scrollIntoView({ behavior: 'auto', block: 'nearest' })
+        }
+    }, [focusPane, selectedEpisodeIndex, selectedSeasonIndex])
+
+    const handleSeasonActivate = async (seasonIndex: number, focusEpisodes: boolean) => {
+        const season = seasons[seasonIndex]
+        if (!season) {
+            return
+        }
+
+        await loadSeason(season, seasonIndex, {
+            focusPane: focusEpisodes ? 'episodes' : 'seasons',
+        })
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (matches(e.key, 'back')) {
-            if (viewMode === 'show') {
-                onClose()
-            } else if (viewMode === 'episodes') {
-                setViewMode('show')
-                setSelectedIndex(0)
+            onClose()
+            return
+        }
+
+        if (focusPane === 'seasons') {
+            if (matches(e.key, 'down')) {
+                e.preventDefault()
+                const nextIndex = clampIndex(selectedSeasonIndex + 1, seasons.length)
+                if (nextIndex !== selectedSeasonIndex && seasons[nextIndex]) {
+                    void loadSeason(seasons[nextIndex], nextIndex, {
+                        focusPane: 'seasons',
+                    })
+                }
+                return
+            }
+
+            if (matches(e.key, 'up')) {
+                e.preventDefault()
+                const nextIndex = clampIndex(selectedSeasonIndex - 1, seasons.length)
+                if (nextIndex !== selectedSeasonIndex && seasons[nextIndex]) {
+                    void loadSeason(seasons[nextIndex], nextIndex, {
+                        focusPane: 'seasons',
+                    })
+                }
+                return
+            }
+
+            if (matches(e.key, 'right')) {
+                e.preventDefault()
+                if (episodes.length > 0) {
+                    setFocusPane('episodes')
+                }
+                return
+            }
+
+            if (matches(e.key, 'confirm')) {
+                e.preventDefault()
+                const season = seasons[selectedSeasonIndex]
+                if (season) {
+                    void handleSeasonActivate(selectedSeasonIndex, true)
+                }
             }
             return
         }
 
-        if (viewMode === 'show') {
-            const rowSize = columnCount
-            if (matches(e.key, 'down')) {
-                setSelectedIndex(Math.min(selectedIndex + rowSize, seasons.length - 1))
-                e.preventDefault()
-            } else if (matches(e.key, 'up')) {
-                setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
-                e.preventDefault()
-            } else if (matches(e.key, 'right')) {
-                setSelectedIndex(Math.min(selectedIndex + 1, seasons.length - 1))
-                e.preventDefault()
-            } else if (matches(e.key, 'left')) {
-                setSelectedIndex(Math.max(selectedIndex - 1, 0))
-                e.preventDefault()
-            } else if (matches(e.key, 'confirm')) {
-                handleSeasonSelect(seasons[selectedIndex])
-                e.preventDefault()
-            }
-        } else if (viewMode === 'episodes') {
-            const rowSize = 1
-            if (matches(e.key, 'down')) {
-                setSelectedIndex(Math.min(selectedIndex + rowSize, episodes.length - 1))
-                e.preventDefault()
-            } else if (matches(e.key, 'up')) {
-                setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
-                e.preventDefault()
-            } else if (matches(e.key, 'confirm')) {
-                const episode = episodes[selectedIndex]
-                onPlay(episode)
-                e.preventDefault()
+        if (matches(e.key, 'down')) {
+            e.preventDefault()
+            setSelectedEpisodeIndex((prev) => clampIndex(prev + 1, episodes.length))
+            return
+        }
+
+        if (matches(e.key, 'up')) {
+            e.preventDefault()
+            setSelectedEpisodeIndex((prev) => clampIndex(prev - 1, episodes.length))
+            return
+        }
+
+        if (matches(e.key, 'left')) {
+            e.preventDefault()
+            setFocusPane('seasons')
+            return
+        }
+
+        if (matches(e.key, 'confirm')) {
+            e.preventDefault()
+            const episode = episodes[selectedEpisodeIndex]
+            if (episode) {
+                void playEpisode(episode)
             }
         }
     }
@@ -227,70 +334,56 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
             tabIndex={0}
             autoFocus
         >
-            <div className="show-detail-card" onClick={(e) => e.stopPropagation()}>
-                {viewMode === 'show' && (
-                    <div className="show-detail-view">
-                        <div className="show-header">
-                            <div className="show-detail-poster">
-                                {show.posterUrl ? (
-                                    <LazyImage src={show.posterUrl} alt={show.title} />
-                                ) : (
-                                    <div className="show-detail-poster-placeholder">
-                                        {show.title.charAt(0).toUpperCase()}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="show-detail-info">
-                                <h2 className="show-detail-title">
-                                    {show.title}
-                                    {show.year && <span className="show-detail-year"> ({show.year})</span>}
-                                </h2>
-
-                                {show.overview && (
-                                    <p className="show-detail-overview">{show.overview}</p>
-                                )}
-
-                                {/* Continue Watching / Next Episode */}
-                                {continueWatchingEpisode && (
-                                    <div className="continue-watching-section">
-                                        <p className="continue-label">
-                                            {continueWatchingEpisode.resumePosition && continueWatchingEpisode.resumePosition > 0
-                                                ? 'Continue Watching'
-                                                : 'Next Episode'}
-                                        </p>
-                                        <button
-                                            className="continue-button"
-                                            onClick={() => {
-                                                onPlay(continueWatchingEpisode)
-                                            }}
-                                        >
-                                            <span className="play-icon">▶</span>
-                                            {continueWatchingEpisode.episodeNumber && `E${continueWatchingEpisode.episodeNumber}: `}
-                                            {continueWatchingEpisode.title}
-                                        </button>
-                                    </div>
-                                )}
-
-                                <p className="show-detail-nav-hint">
-                                    ↑ ↓ ← → select season • Enter play • Back close
-                                </p>
-                            </div>
+            <div className="show-detail-card" onClick={(event) => event.stopPropagation()}>
+                <div className="show-detail-view">
+                    <div className="show-header">
+                        <div className="show-detail-poster">
+                            {show.posterUrl ? (
+                                <LazyImage src={show.posterUrl} alt={show.title} />
+                            ) : (
+                                <div className="show-detail-poster-placeholder">
+                                    {show.title.charAt(0).toUpperCase()}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="show-seasons-section">
-                            <h3 className="seasons-title">Seasons</h3>
-                            {loading ? (
-                                <p>Loading seasons...</p>
+                        <div className="show-detail-info">
+                            <h2 className="show-detail-title">
+                                {show.title}
+                                {show.year && <span className="show-detail-year"> ({show.year})</span>}
+                            </h2>
+
+                            {show.overview && (
+                                <p className="show-detail-overview">{show.overview}</p>
+                            )}
+
+                            <p className="show-detail-nav-hint">
+                                ↑ ↓ seasons / episodes • ← → switch pane • Enter play • Back close
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="show-content-split">
+                        <aside className="season-panel">
+                            <div className="panel-header">
+                                <h3 className="panel-title">Seasons</h3>
+                                <span className="panel-meta">{seasons.length} items</span>
+                            </div>
+
+                            {loadingSeasons ? (
+                                <p className="panel-empty">Loading seasons...</p>
                             ) : seasons.length === 0 ? (
-                                <p>No seasons found</p>
+                                <p className="panel-empty">No seasons found</p>
                             ) : (
-                                <div className="seasons-grid" style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
-                                    {seasons.map((season, idx) => (
+                                <div className="seasons-list">
+                                    {seasons.map((season, index) => (
                                         <div
                                             key={season.id}
-                                            className={`season-card ${idx === selectedIndex ? 'focused' : ''}`}
-                                            onClick={() => handleSeasonSelect(season)}
+                                            className={`season-card ${index === selectedSeasonIndex && focusPane === 'seasons' ? 'focused' : ''}`}
+                                            onClick={() => {
+                                                setSelectedSeasonIndex(index)
+                                                void handleSeasonActivate(index, true)
+                                            }}
                                         >
                                             <div className="season-poster">
                                                 {season.posterUrl ? (
@@ -302,122 +395,129 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                 )}
                                             </div>
                                             <div className="season-info">
-                                                <p className="season-title">{season.title}</p>
+                                                <p className="season-title">
+                                                    {season.seasonNumber !== undefined ? `Season ${season.seasonNumber}` : season.title}
+                                                </p>
+                                                {season.overview && (
+                                                    <p className="season-description">{season.overview}</p>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                        </div>
-                    </div>
-                )}
+                        </aside>
 
-                {viewMode === 'episodes' && (
-                    <div className="show-episodes-view">
-                        <h3 className="view-title">
-                            {show.title} - {selectedSeason?.title}
-                        </h3>
+                        <section className="episode-panel">
+                            <div className="panel-header">
+                                <div>
+                                    <h3 className="panel-title">
+                                        {selectedSeason?.title || 'Episodes'}
+                                    </h3>
+                                    {selectedSeason?.seasonNumber !== undefined && (
+                                        <p className="panel-subtitle">
+                                            Season {selectedSeason.seasonNumber}
+                                        </p>
+                                    )}
+                                </div>
+                                <span className="panel-meta">{episodes.length} items</span>
+                            </div>
 
-                        {selectedSeason && (
-                            <div className="selected-season-summary">
-                                {selectedSeason.seasonNumber !== undefined && (
-                                    <span className="selected-season-number">
-                                        Season {selectedSeason.seasonNumber}
-                                    </span>
-                                )}
-                                {selectedSeason.overview && (
+                            {selectedSeason?.overview && (
+                                <div className="selected-season-summary">
                                     <p className="selected-season-overview">
                                         {selectedSeason.overview}
                                     </p>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="episodes-list">
-                            {loading ? (
-                                <p>Loading episodes...</p>
-                            ) : episodes.length === 0 ? (
-                                <p>No episodes found</p>
-                            ) : (
-                                episodes.map((episode, idx) => (
-                                    <div
-                                        key={episode.id}
-                                        className={`episode-card ${idx === selectedIndex ? 'focused' : ''}`}
-                                        onClick={() => onPlay(episode)}
-                                    >
-                                        <div className="episode-poster">
-                                            {episode.posterUrl ? (
-                                                <LazyImage src={episode.posterUrl} alt={episode.title} />
-                                            ) : (
-                                                <div className="episode-poster-placeholder">
-                                                    {episode.episodeNumber !== undefined ? `E${episode.episodeNumber}` : 'E?'}
-                                                </div>
-                                            )}
-                                            <div className="episode-play-badge" aria-hidden="true">
-                                                <span>▶</span>
-                                            </div>
-                                            {episode.watched && (
-                                                <div className="episode-watched-chip" aria-hidden="true">
-                                                    <CheckIcon />
-                                                </div>
-                                            )}
-                                            {episode.playedPercentage && episode.playedPercentage > 0 && !episode.watched && (
-                                                <div className="episode-progress-bar">
-                                                    <div
-                                                        className="episode-progress-fill"
-                                                        style={{ width: `${episode.playedPercentage}%` }}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="episode-info">
-                                            <p className="episode-label">
-                                                {episode.episodeNumber !== undefined
-                                                    ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
-                                                    : `${idx + 1}. ${episode.title || 'Untitled'}`}
-                                            </p>
-                                            <div className="episode-meta">
-                                                {episode.duration && (
-                                                    <span>{formatDuration(episode.duration)}</span>
-                                                )}
-                                                {episode.communityRating !== undefined && (
-                                                    <span className="episode-rating">
-                                                        <span className="rating-star">★</span>
-                                                        {episode.communityRating.toFixed(1)}
-                                                    </span>
-                                                )}
-                                                {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
-                                                    <span className="episode-status">Resume</span>
-                                                )}
-                                            </div>
-                                            {episode.overview && (
-                                                <p className="episode-description">{episode.overview}</p>
-                                            )}
-                                        </div>
-                                        <div className="episode-actions" aria-hidden="true">
-                                            <span className="episode-action-icon">
-                                                <InfoIcon />
-                                            </span>
-                                            <span className="episode-action-icon">
-                                                <CheckIcon />
-                                            </span>
-                                            <span className="episode-action-icon">
-                                                <HeartIcon />
-                                            </span>
-                                            <span className="episode-action-icon">
-                                                <MoreIcon />
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
+                                </div>
                             )}
-                        </div>
 
-                        <p className="show-detail-nav-hint">
-                            ↑ ↓ ← → select episode • Enter play • Back seasons
-                        </p>
+                            {loadingEpisodes ? (
+                                <p className="panel-empty">Loading episodes...</p>
+                            ) : episodes.length === 0 ? (
+                                <p className="panel-empty">No episodes found</p>
+                            ) : (
+                                <div className="episodes-list">
+                                    {episodes.map((episode, index) => (
+                                        <div
+                                            key={episode.id}
+                                            className={`episode-card ${
+                                                index === selectedEpisodeIndex && focusPane === 'episodes' ? 'focused' : ''
+                                            }`}
+                                            onClick={() => {
+                                                setSelectedEpisodeIndex(index)
+                                                void playEpisode(episode)
+                                            }}
+                                        >
+                                            <div className="episode-poster">
+                                                {episode.posterUrl ? (
+                                                    <LazyImage src={episode.posterUrl} alt={episode.title} />
+                                                ) : (
+                                                    <div className="episode-poster-placeholder">
+                                                        {episode.episodeNumber !== undefined ? `E${episode.episodeNumber}` : 'E?'}
+                                                    </div>
+                                                )}
+                                                <div className="episode-play-badge" aria-hidden="true">
+                                                    <span>▶</span>
+                                                </div>
+                                                {episode.watched && (
+                                                    <div className="episode-watched-chip" aria-hidden="true">
+                                                        <CheckIcon />
+                                                    </div>
+                                                )}
+                                                {episode.playedPercentage && episode.playedPercentage > 0 && !episode.watched && (
+                                                    <div className="episode-progress-bar">
+                                                        <div
+                                                            className="episode-progress-fill"
+                                                            style={{ width: `${episode.playedPercentage}%` }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="episode-info">
+                                                <p className="episode-label">
+                                                    {episode.episodeNumber !== undefined
+                                                        ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
+                                                        : `${index + 1}. ${episode.title || 'Untitled'}`}
+                                                </p>
+                                                <div className="episode-meta">
+                                                    {episode.duration && (
+                                                        <span>{formatDuration(episode.duration)}</span>
+                                                    )}
+                                                    {episode.communityRating !== undefined && (
+                                                        <span className="episode-rating">
+                                                            <span className="rating-star">★</span>
+                                                            {episode.communityRating.toFixed(1)}
+                                                        </span>
+                                                    )}
+                                                    {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
+                                                        <span className="episode-status">Resume</span>
+                                                    )}
+                                                </div>
+                                                {episode.overview && (
+                                                    <p className="episode-description">{episode.overview}</p>
+                                                )}
+                                            </div>
+                                            <div className="episode-actions" aria-hidden="true">
+                                                <span className="episode-action-icon">
+                                                    <InfoIcon />
+                                                </span>
+                                                <span className="episode-action-icon">
+                                                    <CheckIcon />
+                                                </span>
+                                                <span className="episode-action-icon">
+                                                    <HeartIcon />
+                                                </span>
+                                                <span className="episode-action-icon">
+                                                    <MoreIcon />
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
                     </div>
-                )}
+                </div>
             </div>
         </div>
     )
