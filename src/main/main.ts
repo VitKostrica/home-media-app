@@ -213,6 +213,10 @@ ipcMain.handle('jellyfin:get-episodes', async (_, seriesId: string, seasonId: st
     return await jellyfinService.getEpisodes(seriesId, seasonId)
 })
 
+ipcMain.handle('jellyfin:get-item-details', async (_, itemId: string) => {
+    return await jellyfinService.getItemDetails(itemId)
+})
+
 ipcMain.handle('jellyfin:get-resume-items', async () => {
     return await jellyfinService.getResumeItems()
 })

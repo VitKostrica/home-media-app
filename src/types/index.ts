@@ -81,6 +81,7 @@ export interface ElectronAPI {
         getSeries: () => Promise<MediaItem[]>
         getSeasons: (seriesId: string) => Promise<MediaItem[]>
         getEpisodes: (seriesId: string, seasonId: string) => Promise<MediaItem[]>
+        getItemDetails: (itemId: string) => Promise<MediaItem | null>
         getResumeItems: () => Promise<MediaItem[]>
         getNextUpItems: () => Promise<MediaItem[]>
         getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>

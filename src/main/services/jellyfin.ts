@@ -363,8 +363,8 @@ export async function getSeasons(seriesId: string): Promise<MappedItem[]> {
         const api = getClient()
         const response = await api.get(`/Shows/${seriesId}/Seasons`, {
             params: {
-                UserId: userId,
-                Fields: 'Overview,UserData,ImageTags,IndexNumber,ParentIndexNumber,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,SeasonName',
+                userId,
+                Fields: 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount',
             },
             headers: getHeaders(),
         })
@@ -386,9 +386,9 @@ export async function getEpisodes(
         const api = getClient()
         const response = await api.get(`/Shows/${seriesId}/Episodes`, {
             params: {
-                UserId: userId,
-                SeasonId: seasonId,
-                Fields: 'Overview,Path,MediaSources,UserData,IndexNumber,ParentIndexNumber,SeriesName,SeasonName,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
+                seasonId,
+                userId,
+                Fields: 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount,Overview',
             },
             headers: getHeaders(),
         })
@@ -397,6 +397,26 @@ export async function getEpisodes(
         handleAuthError(err)
         console.error('Failed to fetch episodes:', err)
         return []
+    }
+}
+
+export async function getItemDetails(itemId: string): Promise<MappedItem | null> {
+    if (!ensureAuth()) return null
+
+    try {
+        const api = getClient()
+        const response = await api.get(`/Users/${userId}/Items/${itemId}`, {
+            params: {
+                userId,
+                Fields: 'Overview,Path,MediaSources,UserData,IndexNumber,ParentIndexNumber,SeriesId,SeriesName,SeasonName,ProductionYear,ImageTags,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,BackdropImageTags',
+            },
+            headers: getHeaders(),
+        })
+        return mapItem(response.data)
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to fetch item details:', err)
+        return null
     }
 }
 

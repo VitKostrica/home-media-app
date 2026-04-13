@@ -92,23 +92,29 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
         }
     }
 
-    const fetchEpisodes = async (seasonId: string) => {
+    const handleSeasonSelect = async (season: Season) => {
         try {
             setLoading(true)
-            const response = await window.electron.jellyfinApi.getEpisodes(show.id, seasonId)
-            setEpisodes(response)
+            const [seasonDetails, episodeResponse] = await Promise.all([
+                window.electron.jellyfinApi.getItemDetails(season.id),
+                window.electron.jellyfinApi.getEpisodes(show.id, season.id),
+            ])
+
+            setSelectedSeason({
+                ...season,
+                title: seasonDetails?.title || season.title,
+                overview: seasonDetails?.overview ?? season.overview,
+                seasonNumber: seasonDetails?.seasonNumber ?? season.seasonNumber,
+                posterUrl: seasonDetails?.posterUrl ?? season.posterUrl,
+            })
+            setEpisodes(episodeResponse)
             setSelectedIndex(0)
+            setViewMode('episodes')
         } catch (err) {
-            console.error('Failed to fetch episodes:', err)
+            console.error('Failed to fetch season details:', err)
         } finally {
             setLoading(false)
         }
-    }
-
-    const handleSeasonSelect = (season: Season) => {
-        setSelectedSeason(season)
-        fetchEpisodes(season.id)
-        setViewMode('episodes')
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
