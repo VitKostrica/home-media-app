@@ -36,7 +36,7 @@ interface JellyfinItem {
 interface MappedItem {
     id: string
     title: string
-    type: 'movie' | 'series' | 'episode'
+    type: 'movie' | 'series' | 'season' | 'episode'
     year?: number
     posterUrl?: string
     backdropUrl?: string
@@ -97,7 +97,7 @@ function resolveItemPath(itemPath: string | undefined, itemType: MappedItem['typ
         return mapToLibraryBase(itemPath, config.moviesBasePath, ['movies'])
     }
 
-    if ((itemType === 'series' || itemType === 'episode') && config.showsBasePath) {
+    if ((itemType === 'series' || itemType === 'season' || itemType === 'episode') && config.showsBasePath) {
         return mapToLibraryBase(itemPath, config.showsBasePath, ['shows', 'tv', 'series'])
     }
 
@@ -169,7 +169,14 @@ function mapItem(item: JellyfinItem): MappedItem {
     const config = getConfig()
     const token = accessToken || config.jellyfinApiKey
     const jellyfinPath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
-    const itemType = item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode'
+    const itemType =
+        item.Type === 'Movie'
+            ? 'movie'
+            : item.Type === 'Series'
+                ? 'series'
+                : item.Type === 'Season'
+                    ? 'season'
+                    : 'episode'
     const filePath = resolveItemPath(jellyfinPath, itemType)
 
     // Always use Jellyfin for poster images
@@ -177,8 +184,8 @@ function mapItem(item: JellyfinItem): MappedItem {
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
 
-    // For episodes, prefer series poster so cards match Movies/Shows visual style.
-    if (itemType === 'episode') {
+    // For episodes and seasons, prefer series poster so cards match Movies/Shows visual style.
+    if (itemType === 'episode' || itemType === 'season') {
         if (item.SeriesId && item.SeriesPrimaryImageTag) {
             posterUrl = `${config.jellyfinUrl}/Items/${item.SeriesId}/Images/Primary?tag=${item.SeriesPrimaryImageTag}${token ? `&api_key=${token}` : ''}`
         } else if (item.ParentThumbItemId && item.ParentThumbImageTag) {
@@ -186,9 +193,17 @@ function mapItem(item: JellyfinItem): MappedItem {
         }
     }
 
+    const seasonNumber =
+        itemType === 'season'
+            ? item.IndexNumber ?? item.ParentIndexNumber
+            : item.ParentIndexNumber
+
     return {
         id: item.Id,
-        title: item.Name,
+        title:
+            itemType === 'season'
+                ? item.Name || (seasonNumber !== undefined ? `Season ${seasonNumber}` : 'Season')
+                : item.Name,
         type: itemType,
         year: item.ProductionYear,
         posterUrl,
@@ -206,7 +221,7 @@ function mapItem(item: JellyfinItem): MappedItem {
         seriesName: item.SeriesName,
         seriesId: item.SeriesId,
         seasonName: item.SeasonName,
-        seasonNumber: item.ParentIndexNumber,
+        seasonNumber,
         episodeNumber: item.IndexNumber,
     }
 }
@@ -304,7 +319,7 @@ export async function getSeasons(seriesId: string): Promise<MappedItem[]> {
         const response = await api.get(`/Shows/${seriesId}/Seasons`, {
             params: {
                 UserId: userId,
-                Fields: 'Overview,UserData',
+                Fields: 'Overview,UserData,ImageTags,IndexNumber,ParentIndexNumber,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,SeasonName',
             },
             headers: getHeaders(),
         })
@@ -328,7 +343,7 @@ export async function getEpisodes(
             params: {
                 UserId: userId,
                 SeasonId: seasonId,
-                Fields: 'Overview,Path,MediaSources,UserData',
+                Fields: 'Overview,Path,MediaSources,UserData,IndexNumber,ParentIndexNumber,SeriesName,SeasonName,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
             },
             headers: getHeaders(),
         })

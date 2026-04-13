@@ -4,7 +4,7 @@ import type { KeybindingsConfig } from './keybindings'
 export interface MediaItem {
     id: string
     title: string
-    type: 'movie' | 'series' | 'episode'
+    type: 'movie' | 'series' | 'season' | 'episode'
     year?: number
     posterUrl?: string
     backdropUrl?: string

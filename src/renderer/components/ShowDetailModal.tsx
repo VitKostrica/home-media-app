@@ -261,6 +261,21 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                             {show.title} - {selectedSeason?.title}
                         </h3>
 
+                        {selectedSeason && (
+                            <div className="selected-season-summary">
+                                {selectedSeason.seasonNumber !== undefined && (
+                                    <span className="selected-season-number">
+                                        Season {selectedSeason.seasonNumber}
+                                    </span>
+                                )}
+                                {selectedSeason.overview && (
+                                    <p className="selected-season-overview">
+                                        {selectedSeason.overview}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div className="episodes-grid" style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
                             {loading ? (
                                 <p>Loading episodes...</p>
@@ -284,10 +299,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                         </div>
                                         <div className="episode-info">
                                             <p className="episode-label">
-                                                {episode.episodeNumber !== undefined
-                                                    ? `Episode ${episode.episodeNumber}`
-                                                    : 'Episode'}{' '}
-                                                - {episode.title || 'Untitled'}
+                                                Episode {episode.episodeNumber ?? idx + 1} - {episode.title || 'Untitled'}
                                             </p>
                                             {episode.overview && (
                                                 <p className="episode-description">{episode.overview}</p>

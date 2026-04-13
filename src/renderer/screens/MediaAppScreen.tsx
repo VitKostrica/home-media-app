@@ -9,7 +9,7 @@ import { isEffectivelyFinished } from '../utils/playbackProgress'
 interface MediaItem {
     id: string
     title: string
-    type: 'movie' | 'series' | 'episode'
+    type: 'movie' | 'series' | 'season' | 'episode'
     year?: number
     posterUrl?: string
     overview?: string
