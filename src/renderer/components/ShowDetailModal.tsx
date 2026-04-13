@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import '../styles/ShowDetailModal.css'
 import LazyImage from './LazyImage'
 import { useKeybindings } from '../hooks/useKeybindings'
@@ -133,56 +133,59 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
         }
     }
 
-    const loadSeason = async (
-        season: Season,
-        seasonIndex: number,
-        options?: { focusPane?: FocusPane; episodeNumber?: number }
-    ) => {
-        const requestId = ++loadRequestRef.current
-        setLoadingEpisodes(true)
-        setSelectedSeasonIndex(seasonIndex)
-        setSelectedSeason(season)
-        setSelectedEpisodeIndex(0)
-        setEpisodes([])
-
-        try {
-            const [seasonDetails, episodeResponse] = await Promise.all([
-                window.electron.jellyfinApi.getItemDetails(season.id),
-                window.electron.jellyfinApi.getEpisodes(show.id, season.id),
-            ])
-
-            if (requestId !== loadRequestRef.current) {
-                return
-            }
-
-            const nextSeason: Season = {
-                ...season,
-                title: seasonDetails?.title || season.title,
-                overview: seasonDetails?.overview ?? season.overview,
-                seasonNumber: seasonDetails?.seasonNumber ?? season.seasonNumber,
-                posterUrl: seasonDetails?.posterUrl ?? season.posterUrl,
-            }
-
-            const targetEpisodeIndex = options?.episodeNumber !== undefined
-                ? episodeResponse.findIndex((episode) => episode.episodeNumber === options.episodeNumber)
-                : 0
-
-            setSelectedSeason(nextSeason)
+    const loadSeason = useCallback(
+        async (
+            season: Season,
+            seasonIndex: number,
+            options?: { focusPane?: FocusPane; episodeNumber?: number }
+        ) => {
+            const requestId = ++loadRequestRef.current
+            setLoadingEpisodes(true)
             setSelectedSeasonIndex(seasonIndex)
-            setEpisodes(episodeResponse)
-            setSelectedEpisodeIndex(clampIndex(targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0, episodeResponse.length))
+            setSelectedSeason(season)
+            setSelectedEpisodeIndex(0)
+            setEpisodes([])
 
-            if (options?.focusPane) {
-                setFocusPane(options.focusPane)
+            try {
+                const [seasonDetails, episodeResponse] = await Promise.all([
+                    window.electron.jellyfinApi.getItemDetails(season.id),
+                    window.electron.jellyfinApi.getEpisodes(show.id, season.id),
+                ])
+
+                if (requestId !== loadRequestRef.current) {
+                    return
+                }
+
+                const nextSeason: Season = {
+                    ...season,
+                    title: seasonDetails?.title || season.title,
+                    overview: seasonDetails?.overview ?? season.overview,
+                    seasonNumber: seasonDetails?.seasonNumber ?? season.seasonNumber,
+                    posterUrl: seasonDetails?.posterUrl ?? season.posterUrl,
+                }
+
+                const targetEpisodeIndex = options?.episodeNumber !== undefined
+                    ? episodeResponse.findIndex((episode) => episode.episodeNumber === options.episodeNumber)
+                    : 0
+
+                setSelectedSeason(nextSeason)
+                setSelectedSeasonIndex(seasonIndex)
+                setEpisodes(episodeResponse)
+                setSelectedEpisodeIndex(clampIndex(targetEpisodeIndex >= 0 ? targetEpisodeIndex : 0, episodeResponse.length))
+
+                if (options?.focusPane) {
+                    setFocusPane(options.focusPane)
+                }
+            } catch (err) {
+                console.error('Failed to fetch season details:', err)
+            } finally {
+                if (requestId === loadRequestRef.current) {
+                    setLoadingEpisodes(false)
+                }
             }
-        } catch (err) {
-            console.error('Failed to fetch season details:', err)
-        } finally {
-            if (requestId === loadRequestRef.current) {
-                setLoadingEpisodes(false)
-            }
-        }
-    }
+        },
+        [show.id]
+    )
 
     useEffect(() => {
         let cancelled = false
@@ -241,16 +244,19 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
         }
     }, [focusPane, selectedEpisodeIndex, selectedSeasonIndex])
 
-    const handleSeasonActivate = async (seasonIndex: number, focusEpisodes: boolean) => {
-        const season = seasons[seasonIndex]
-        if (!season) {
-            return
-        }
+    const handleSeasonActivate = useCallback(
+        async (seasonIndex: number, focusEpisodes: boolean) => {
+            const season = seasons[seasonIndex]
+            if (!season) {
+                return
+            }
 
-        await loadSeason(season, seasonIndex, {
-            focusPane: focusEpisodes ? 'episodes' : 'seasons',
-        })
-    }
+            await loadSeason(season, seasonIndex, {
+                focusPane: focusEpisodes ? 'episodes' : 'seasons',
+            })
+        },
+        [loadSeason, seasons]
+    )
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (matches(e.key, 'back')) {
