@@ -165,6 +165,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
     const contentRef = useRef<HTMLDivElement>(null)
     const skipNextAutoRefreshRef = useRef(false)
+    const fetchRequestIdRef = useRef(0)
 
     const focusContinueWatching = useCallback((row: ContinueRow = 'continue', index: number = 0) => {
         setActiveTab(0)
@@ -180,22 +181,24 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }, [])
 
     const fetchItems = useCallback(
-        async (tabIndex: ActiveTab = activeTab, options?: { retryNextUp?: boolean }) => {
+        async (tabIndex: ActiveTab, options?: { retryNextUp?: boolean }) => {
+            const requestId = ++fetchRequestIdRef.current
             setLoading(true)
             setError(null)
             try {
                 const config = await window.electron?.configApi?.get()
+                if (requestId !== fetchRequestIdRef.current) {
+                    return
+                }
                 if (!config?.jellyfinApiKey || !config?.jellyfinUserId) {
                     setIsAuthenticated(false)
                     setItems([])
-                    setLoading(false)
                     return
                 }
 
                 const api = window.electron?.jellyfinApi
                 if (!api) {
                     setError('Electron API not available')
-                    setLoading(false)
                     return
                 }
 
@@ -203,11 +206,23 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
                 if (tabIndex === 0) {
                     const resumeItems = await api.getResumeItems()
+                    if (requestId !== fetchRequestIdRef.current) {
+                        return
+                    }
                     let nextUpItems = await api.getNextUpItems()
+                    if (requestId !== fetchRequestIdRef.current) {
+                        return
+                    }
 
                     if (options?.retryNextUp && nextUpItems.length === 0) {
                         await sleep(NEXT_UP_RETRY_DELAY_MS)
+                        if (requestId !== fetchRequestIdRef.current) {
+                            return
+                        }
                         nextUpItems = await api.getNextUpItems()
+                        if (requestId !== fetchRequestIdRef.current) {
+                            return
+                        }
                     }
 
                     const resumeUnique = (resumeItems || []).filter(
@@ -234,15 +249,23 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     setNextUpItems([])
                 }
 
+                if (requestId !== fetchRequestIdRef.current) {
+                    return
+                }
                 setItems(data || [])
             } catch (err: unknown) {
+                if (requestId !== fetchRequestIdRef.current) {
+                    return
+                }
                 const message = err instanceof Error ? err.message : 'Failed to load library'
                 setError(message)
             } finally {
-                setLoading(false)
+                if (requestId === fetchRequestIdRef.current) {
+                    setLoading(false)
+                }
             }
         },
-        [activeTab]
+        []
     )
 
     useEffect(() => {
@@ -954,7 +977,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         </div>
                     )}
 
-                    {loading ? (
+                    {loading && items.length === 0 && !error ? (
                         <div className="loading">Loading...</div>
                     ) : (
                         <>
