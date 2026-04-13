@@ -171,8 +171,8 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 18px;
     overflow-y: auto;
     padding-right: 8px;
     align-content: start;
