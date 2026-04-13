@@ -19,6 +19,7 @@ interface MediaItem {
     playedPercentage?: number
     filePath?: string
     seriesName?: string
+    seriesId?: string
     seasonNumber?: number
     episodeNumber?: number
 }
@@ -31,6 +32,7 @@ type ActiveTab = 0 | 1 | 2
 type SidebarIndex = 0 | 1 | 2 | 3
 type FocusArea = 'sidebar' | 'content'
 type ContinueRow = 'continue' | 'next'
+type DetailFocus = 'play' | 'actions'
 
 const COLUMNS = 6
 const CONTINUE_WATCHING_ROW_LIMIT = 6
@@ -102,6 +104,42 @@ function PlayIcon() {
     )
 }
 
+function SeenIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" />
+            <circle cx="12" cy="12" r="9" />
+        </svg>
+    )
+}
+
+function RestartIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12a7 7 0 1 0 2-4.9" />
+            <path d="M4 4v5h5" />
+        </svg>
+    )
+}
+
+function PreviousEpisodeIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 6v12" />
+            <path d="M18 6l-8 6 8 6z" />
+        </svg>
+    )
+}
+
+function NextEpisodeIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 6v12" />
+            <path d="M6 6l8 6-8 6z" />
+        </svg>
+    )
+}
+
 const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [activeTab, setActiveTab] = useState<ActiveTab>(0)
     const [items, setItems] = useState<MediaItem[]>([])
@@ -119,6 +157,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [showDetail, setShowDetail] = useState<boolean>(false)
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
     const [showShowDetail, setShowShowDetail] = useState<boolean>(false)
+    const [detailFocus, setDetailFocus] = useState<DetailFocus>('play')
+    const [detailActionIndex, setDetailActionIndex] = useState<number>(0)
+    const [episodeNavigation, setEpisodeNavigation] = useState<MediaItem[]>([])
+    const [episodeNavigationLoading, setEpisodeNavigationLoading] = useState<boolean>(false)
     const { matches } = useKeybindings()
 
     const contentRef = useRef<HTMLDivElement>(null)
@@ -223,9 +265,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     useEffect(() => {
         const handlePlayerStopped = () => {
             setVlcPlayingItem(null)
-            setShowDetail(false)
-            setShowShowDetail(false)
-            setSelectedItem(null)
+            closeDetailViews()
             skipNextAutoRefreshRef.current = true
             setFocusedArea('content')
             focusContinueWatching('continue', 0)
@@ -241,7 +281,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 window.electron.off?.('player:stopped', handlePlayerStopped)
             }
         }
-    }, [fetchItems, focusContinueWatching])
+    }, [closeDetailViews, fetchItems, focusContinueWatching])
 
     useEffect(() => {
         if (!isAuthenticated || loading || error) {
@@ -276,6 +316,72 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         loading,
         nextUpItems.length,
     ])
+
+    useEffect(() => {
+        if (!showDetail) {
+            setDetailFocus('play')
+            setDetailActionIndex(0)
+            setEpisodeNavigation([])
+            setEpisodeNavigationLoading(false)
+            return
+        }
+
+        setDetailFocus('play')
+        setDetailActionIndex(0)
+    }, [selectedItem?.id, showDetail])
+
+    useEffect(() => {
+        let cancelled = false
+
+        const loadEpisodeNavigation = async () => {
+            if (!showDetail || !selectedItem || selectedItem.type !== 'episode' || !selectedItem.seriesId) {
+                setEpisodeNavigation([])
+                setEpisodeNavigationLoading(false)
+                return
+            }
+
+            setEpisodeNavigationLoading(true)
+            try {
+                const api = window.electron?.jellyfinApi
+                const seasons = (await api?.getSeasons(selectedItem.seriesId)) || []
+                const seasonEpisodeLists = await Promise.all(
+                    seasons
+                        .filter((season) => !!season.id)
+                        .map((season) => api?.getEpisodes(selectedItem.seriesId || '', season.id) || [])
+                )
+
+                const flattenedEpisodes = seasonEpisodeLists
+                    .flat()
+                    .filter((episode): episode is MediaItem => Boolean(episode?.id))
+                    .sort((left, right) => {
+                        const leftSeason = left.seasonNumber ?? 0
+                        const rightSeason = right.seasonNumber ?? 0
+                        if (leftSeason !== rightSeason) {
+                            return leftSeason - rightSeason
+                        }
+                        return (left.episodeNumber ?? 0) - (right.episodeNumber ?? 0)
+                    })
+
+                if (!cancelled) {
+                    setEpisodeNavigation(flattenedEpisodes)
+                }
+            } catch {
+                if (!cancelled) {
+                    setEpisodeNavigation([])
+                }
+            } finally {
+                if (!cancelled) {
+                    setEpisodeNavigationLoading(false)
+                }
+            }
+        }
+
+        void loadEpisodeNavigation()
+
+        return () => {
+            cancelled = true
+        }
+    }, [selectedItem?.id, selectedItem?.seriesId, selectedItem?.type, showDetail])
 
     useEffect(() => {
         if (focusedArea !== 'content' || activeTab === 0 || !contentRef.current) {
@@ -347,6 +453,19 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         setVlcPlayingItem(null)
     }, [])
 
+    function closeDetailViews() {
+        setShowDetail(false)
+        setShowShowDetail(false)
+        setSelectedItem(null)
+        setEpisodeNavigation([])
+        setDetailFocus('play')
+        setDetailActionIndex(0)
+    }
+
+    const refreshCurrentView = useCallback(() => {
+        void fetchItems(activeTab, activeTab === 0 ? { retryNextUp: true } : undefined)
+    }, [activeTab, fetchItems])
+
     const openItem = useCallback((item: MediaItem) => {
         setSelectedItem(item)
         if (item.type === 'series') {
@@ -355,6 +474,127 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             setShowDetail(true)
         }
     }, [])
+
+    const markSelectedAsSeen = useCallback(async () => {
+        if (!selectedItem) {
+            return
+        }
+
+        try {
+            await window.electron?.jellyfinApi?.markPlayed(selectedItem.id)
+            closeDetailViews()
+            refreshCurrentView()
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to mark item as seen'
+            alert(`Error: ${message}`)
+        }
+    }, [closeDetailViews, refreshCurrentView, selectedItem])
+
+    const restartSelectedItem = useCallback(async () => {
+        if (!selectedItem?.filePath) {
+            return
+        }
+
+        try {
+            await launchVlc({
+                ...selectedItem,
+                resumePosition: 0,
+            })
+        } catch {
+            // launchVlc already reports errors
+        }
+    }, [launchVlc, selectedItem])
+
+    const getAdjacentEpisode = useCallback(
+        (direction: 'previous' | 'next'): MediaItem | null => {
+            if (!selectedItem || selectedItem.type !== 'episode' || episodeNavigation.length === 0) {
+                return null
+            }
+
+            const currentIndex = episodeNavigation.findIndex((item) => item.id === selectedItem.id)
+            if (currentIndex < 0) {
+                return null
+            }
+
+            const targetIndex = direction === 'previous' ? currentIndex - 1 : currentIndex + 1
+            if (targetIndex < 0 || targetIndex >= episodeNavigation.length) {
+                return null
+            }
+
+            return episodeNavigation[targetIndex] || null
+        },
+        [episodeNavigation, selectedItem]
+    )
+
+    const playAdjacentEpisode = useCallback(
+        async (direction: 'previous' | 'next') => {
+            const target = getAdjacentEpisode(direction)
+            if (!target?.filePath) {
+                return
+            }
+
+            await launchVlc(target)
+        },
+        [getAdjacentEpisode, launchVlc]
+    )
+
+    const getDetailActions = useCallback(() => {
+        if (!selectedItem) {
+            return []
+        }
+
+        const actions: Array<{
+            key: string
+            label: string
+            icon: React.FC
+            onSelect: () => void | Promise<void>
+            disabled?: boolean
+        }> = [
+            {
+                key: 'mark-seen',
+                label: 'Mark as seen',
+                icon: SeenIcon,
+                onSelect: () => { void markSelectedAsSeen() },
+            },
+            {
+                key: 'restart',
+                label: 'Restart',
+                icon: RestartIcon,
+                onSelect: () => { void restartSelectedItem() },
+                disabled: !selectedItem.filePath,
+            },
+        ]
+
+        if (selectedItem.type === 'episode') {
+            const previousEpisode = getAdjacentEpisode('previous')
+            const nextEpisode = getAdjacentEpisode('next')
+            actions.push(
+                {
+                    key: 'previous-episode',
+                    label: 'Previous episode',
+                    icon: PreviousEpisodeIcon,
+                    onSelect: () => { void playAdjacentEpisode('previous') },
+                    disabled: episodeNavigationLoading || !previousEpisode?.filePath,
+                },
+                {
+                    key: 'next-episode',
+                    label: 'Next episode',
+                    icon: NextEpisodeIcon,
+                    onSelect: () => { void playAdjacentEpisode('next') },
+                    disabled: episodeNavigationLoading || !nextEpisode?.filePath,
+                }
+            )
+        }
+
+        return actions
+    }, [
+        episodeNavigationLoading,
+        getAdjacentEpisode,
+        markSelectedAsSeen,
+        playAdjacentEpisode,
+        restartSelectedItem,
+        selectedItem,
+    ])
 
     const activateSidebarItem = useCallback(
         (index: SidebarIndex) => {
@@ -391,15 +631,61 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             }
 
             if (showDetail) {
+                if (matches(event.key, 'back')) {
+                    event.preventDefault()
+                    closeDetailViews()
+                    return
+                }
+
+                const detailActions = getDetailActions()
+                const actionableIndexes = detailActions
+                    .map((action, index) => (action.disabled ? -1 : index))
+                    .filter((index) => index >= 0)
+
+                if (matches(event.key, 'down')) {
+                    event.preventDefault()
+                    if (detailFocus === 'play' && actionableIndexes.length > 0) {
+                        setDetailFocus('actions')
+                        setDetailActionIndex(0)
+                    }
+                    return
+                }
+
+                if (matches(event.key, 'up')) {
+                    event.preventDefault()
+                    if (detailFocus === 'actions') {
+                        setDetailFocus('play')
+                    }
+                    return
+                }
+
+                if (detailFocus === 'actions') {
+                    if (matches(event.key, 'left')) {
+                        event.preventDefault()
+                        setDetailActionIndex((prev) => Math.max(0, prev - 1))
+                        return
+                    }
+
+                    if (matches(event.key, 'right')) {
+                        event.preventDefault()
+                        setDetailActionIndex((prev) => Math.min(actionableIndexes.length - 1, prev + 1))
+                        return
+                    }
+
+                    if (matches(event.key, 'confirm')) {
+                        event.preventDefault()
+                        const currentAction = detailActions[actionableIndexes[detailActionIndex]]
+                        if (currentAction && !currentAction.disabled) {
+                            currentAction.onSelect()
+                        }
+                        return
+                    }
+                    return
+                }
+
                 if (matches(event.key, 'confirm')) {
                     event.preventDefault()
                     void handlePlay()
-                    return
-                }
-                if (matches(event.key, 'back')) {
-                    event.preventDefault()
-                    setShowDetail(false)
-                    setSelectedItem(null)
                 }
                 return
             }
@@ -589,6 +875,14 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         { label: 'Shows', icon: ShowsIcon },
     ]
 
+    const detailActions = getDetailActions()
+
+    useEffect(() => {
+        if (detailFocus === 'actions' && detailActionIndex > Math.max(detailActions.length - 1, 0)) {
+            setDetailActionIndex(0)
+        }
+    }, [detailActionIndex, detailActions.length, detailFocus])
+
     if (!isAuthenticated) {
         return <JellyfinLogin onSuccess={() => setIsAuthenticated(true)} />
     }
@@ -768,6 +1062,11 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     <span>{selectedItem.title.charAt(0).toUpperCase()}</span>
                                 </div>
                             )}
+                            {selectedItem.type === 'episode' && selectedItem.watched && (
+                                <div className="detail-poster-badge" aria-label="Episode already seen">
+                                    <SeenIcon />
+                                </div>
+                            )}
                         </div>
 
                         <div className="detail-info">
@@ -811,19 +1110,46 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                             )}
 
                             <div className="detail-actions">
-                                <button className="play-button focused" onClick={handlePlay}>
+                                <button
+                                    className={`play-button ${detailFocus === 'play' ? 'focused' : ''}`}
+                                    onClick={() => { void handlePlay() }}
+                                >
                                     <span className="play-icon">
                                         <PlayIcon />
                                     </span>
                                     Play
                                 </button>
+                                <div className="detail-action-row" role="toolbar" aria-label="Media actions">
+                                    {detailActions.map((action, index) => {
+                                        const ActionIcon = action.icon
+                                        return (
+                                            <button
+                                                key={action.key}
+                                                className={`icon-action-button ${
+                                                    detailFocus === 'actions' && detailActionIndex === index ? 'focused' : ''
+                                                } ${action.disabled ? 'disabled' : ''}`}
+                                                onClick={() => {
+                                                    if (!action.disabled) {
+                                                        action.onSelect()
+                                                    }
+                                                }}
+                                                disabled={action.disabled}
+                                                aria-label={action.label}
+                                                title={action.label}
+                                            >
+                                                <ActionIcon />
+                                                <span className="sr-only">{action.label}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
 
                             {!selectedItem.filePath && (
                                 <p className="detail-warning">⚠ No local file path found for this item</p>
                             )}
 
-                            <p className="detail-nav-hint">Enter play • Back close</p>
+                            <p className="detail-nav-hint">Up/Down switch rows • Left/Right move actions • Back close</p>
                         </div>
                     </div>
                 </div>

@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electron', {
             ipcRenderer.invoke('jellyfin:report-progress', itemId, positionTicks, isPaused),
         reportStopped: (itemId: string, positionTicks: number) =>
             ipcRenderer.invoke('jellyfin:report-stopped', itemId, positionTicks),
+        markPlayed: (itemId: string) => ipcRenderer.invoke('jellyfin:mark-played', itemId),
     },
 
     configApi: {

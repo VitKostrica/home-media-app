@@ -394,6 +394,7 @@
     border-radius: 12px;
     overflow: hidden;
     flex-shrink: 0;
+    position: relative;
 }
 
 .detail-poster img {
@@ -415,6 +416,30 @@
     font-size: 5rem;
     font-weight: 200;
     opacity: 0.3;
+}
+
+.detail-poster-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(76, 175, 80, 0.92);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
+}
+
+.detail-poster-badge svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .detail-info {
@@ -509,7 +534,8 @@
 
 .detail-actions {
     display: flex;
-    gap: 16px;
+    flex-direction: column;
+    gap: 14px;
     margin-top: 8px;
 }
 
@@ -543,7 +569,59 @@
     transform: scale(1.03);
     box-shadow:
         0 0 24px rgba(66, 165, 245, 0.3),
-        inset 0 0 12px rgba(66, 165, 245, 0.08);
+    inset 0 0 12px rgba(66, 165, 245, 0.08);
+}
+
+.detail-action-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.icon-action-button {
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    color: #fff;
+    cursor: pointer;
+    transition:
+        transform 180ms ease,
+        background 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.icon-action-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.icon-action-button.focused {
+    background: rgba(66, 165, 245, 0.2);
+    border-color: #42a5f5;
+    box-shadow: 0 0 20px rgba(66, 165, 245, 0.28);
+    transform: scale(1.05);
+}
+
+.icon-action-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.icon-action-button.disabled,
+.icon-action-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
 }
 
 .play-icon {

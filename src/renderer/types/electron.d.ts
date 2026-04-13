@@ -26,6 +26,7 @@ declare global {
                 reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
                 reportProgress: (itemId: string, positionTicks: number, isPaused?: boolean) => Promise<void>
                 reportStopped: (itemId: string, positionTicks: number) => Promise<void>
+                markPlayed: (itemId: string) => Promise<void>
             }
             configApi: {
                 get: () => Promise<AppConfig>

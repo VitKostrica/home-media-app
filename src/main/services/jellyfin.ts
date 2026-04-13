@@ -47,6 +47,7 @@ interface MappedItem {
     playedPercentage?: number
     filePath?: string
     seriesName?: string
+    seriesId?: string
     seasonName?: string
     seasonNumber?: number
     episodeNumber?: number
@@ -203,6 +204,7 @@ function mapItem(item: JellyfinItem): MappedItem {
         playedPercentage: item.UserData?.PlayedPercentage || 0,
         filePath,
         seriesName: item.SeriesName,
+        seriesId: item.SeriesId,
         seasonName: item.SeasonName,
         seasonNumber: item.ParentIndexNumber,
         episodeNumber: item.IndexNumber,

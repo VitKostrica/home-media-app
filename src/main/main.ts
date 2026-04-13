@@ -240,6 +240,10 @@ ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTick
     await jellyfinService.reportStopped(itemId, positionTicks)
 })
 
+ipcMain.handle('jellyfin:mark-played', async (_, itemId: string) => {
+    await jellyfinService.reportStopped(itemId, 0, undefined, { markPlayed: true })
+})
+
 // ── Player IPC ───────────────────────────────────────────────
 
 ipcMain.handle('player:launch', (_, type: string, filePath: string, startPosition?: number, jellyfinItemId?: string, durationSec?: number) => {
