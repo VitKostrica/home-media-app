@@ -223,6 +223,9 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     useEffect(() => {
         const handlePlayerStopped = () => {
             setVlcPlayingItem(null)
+            setShowDetail(false)
+            setShowShowDetail(false)
+            setSelectedItem(null)
             skipNextAutoRefreshRef.current = true
             setFocusedArea('content')
             focusContinueWatching('continue', 0)
