@@ -188,6 +188,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const skipNextAutoRefreshRef = useRef(false)
     const fetchRequestIdRef = useRef(0)
     const playbackResolutionRequestRef = useRef(0)
+    const seriesPosterCacheRef = useRef<Map<string, string | undefined>>(new Map())
 
     const focusContinueWatching = useCallback((row: ContinueRow = 'continue', index: number = 0) => {
         setActiveTab(0)
@@ -255,8 +256,39 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         (item) => item?.id && !seenIds.has(item.id)
                     )
 
-                    const continueRowItems = resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT)
-                    const nextUpRowItems = nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT)
+                    const episodeItems = [...resumeUnique, ...nextUpUnique].filter(
+                        (item) => item.type === 'episode' && !!(item as { seriesId?: string }).seriesId
+                    ) as MediaItem[]
+                    const uniqueSeriesIds = [
+                        ...new Set(
+                            episodeItems
+                                .map((item) => item.seriesId)
+                                .filter((seriesId): seriesId is string => !!seriesId)
+                        ),
+                    ]
+                    const seriesPosters = new Map<string, string | undefined>()
+
+                    await Promise.all(
+                        uniqueSeriesIds.map(async (seriesId) => {
+                            const posterUrl = await resolveSeriesPoster(seriesId)
+                            seriesPosters.set(seriesId, posterUrl)
+                        })
+                    )
+
+                    const attachSeriesPoster = (list: MediaItem[]) =>
+                        list.map((item) => {
+                            if (item.type !== 'episode' || !item.seriesId) {
+                                return item
+                            }
+
+                            return {
+                                ...item,
+                                posterUrl: seriesPosters.get(item.seriesId) ?? item.posterUrl,
+                            }
+                        })
+
+                    const continueRowItems = attachSeriesPoster(resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT))
+                    const nextUpRowItems = attachSeriesPoster(nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT))
 
                     setContinueWatchingItems(continueRowItems)
                     setNextUpItems(nextUpRowItems)
@@ -316,6 +348,18 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             filePath: details.filePath,
             type: item.type,
         }
+    }, [])
+
+    const resolveSeriesPoster = useCallback(async (seriesId: string): Promise<string | undefined> => {
+        if (seriesPosterCacheRef.current.has(seriesId)) {
+            return seriesPosterCacheRef.current.get(seriesId)
+        }
+
+        const api = window.electron?.jellyfinApi
+        const details = api ? await api.getItemDetails(seriesId) : null
+        const posterUrl = details?.posterUrl
+        seriesPosterCacheRef.current.set(seriesId, posterUrl)
+        return posterUrl
     }, [])
 
     useEffect(() => {
