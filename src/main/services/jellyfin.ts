@@ -11,6 +11,7 @@ interface JellyfinItem {
     ProductionYear?: number
     Overview?: string
     RunTimeTicks?: number
+    CommunityRating?: number
     ImageTags?: { Primary?: string }
     BackdropImageTags?: string[]
     UserData?: {
@@ -42,6 +43,7 @@ interface MappedItem {
     backdropUrl?: string
     overview?: string
     duration?: number
+    communityRating?: number
     watched: boolean
     resumePosition?: number
     playedPercentage?: number
@@ -257,6 +259,7 @@ function mapItem(item: JellyfinItem): MappedItem {
             : undefined,
         overview: item.Overview,
         duration: item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 10000000) : undefined,
+        communityRating: item.CommunityRating,
         watched: item.UserData?.Played || false,
         resumePosition: item.UserData?.PlaybackPositionTicks
             ? Math.floor(item.UserData.PlaybackPositionTicks / 10000000)
@@ -405,7 +408,7 @@ export async function getItemDetails(itemId: string): Promise<MappedItem | null>
 
     try {
         const api = getClient()
-        const response = await api.get(`/Users/${userId}/Items/${itemId}`, {
+        const response = await api.get(`/Items/${itemId}`, {
             params: {
                 userId,
                 Fields: 'Overview,Path,MediaSources,UserData,IndexNumber,ParentIndexNumber,SeriesId,SeriesName,SeasonName,ProductionYear,ImageTags,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,BackdropImageTags',

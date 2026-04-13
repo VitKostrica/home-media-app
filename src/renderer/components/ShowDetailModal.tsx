@@ -11,6 +11,7 @@ interface Episode {
     posterUrl?: string
     overview?: string
     duration?: number
+    communityRating?: number
     resumePosition?: number
     playedPercentage?: number
     watched: boolean
@@ -39,6 +40,51 @@ interface ShowDetailModalProps {
 
 type ViewMode = 'show' | 'episodes'
 
+function formatDuration(totalSeconds?: number): string {
+    if (!totalSeconds || totalSeconds <= 0) {
+        return ''
+    }
+
+    const minutes = Math.round(totalSeconds / 60)
+    return `${minutes}m`
+}
+
+function InfoIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 10v6" />
+            <path d="M12 7.5h.01" />
+        </svg>
+    )
+}
+
+function CheckIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" />
+        </svg>
+    )
+}
+
+function HeartIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 21s-7-4.4-9.2-8.7C1 8.8 3.2 6 6.3 6c1.8 0 3.3 1 4.1 2.2C11.2 7 12.7 6 14.5 6c3.1 0 5.3 2.8 3.5 6.3C19 16.6 12 21 12 21z" />
+        </svg>
+    )
+}
+
+function MoreIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.7" />
+            <circle cx="12" cy="12" r="1.7" />
+            <circle cx="12" cy="19" r="1.7" />
+        </svg>
+    )
+}
+
 const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('show')
     const [seasons, setSeasons] = useState<Season[]>([])
@@ -54,6 +100,17 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
     useEffect(() => {
         fetchSeasons()
     }, [])
+
+    useEffect(() => {
+        if (viewMode !== 'episodes') {
+            return
+        }
+
+        const focused = document.querySelector('.episode-card.focused')
+        if (focused instanceof HTMLElement) {
+            focused.scrollIntoView({ behavior: 'auto', block: 'nearest' })
+        }
+    }, [selectedIndex, viewMode])
 
     const findContinueWatchingEpisode = async (seasonsList: Season[]) => {
         // Try to find an episode with resume position
@@ -147,18 +204,12 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                 e.preventDefault()
             }
         } else if (viewMode === 'episodes') {
-            const rowSize = columnCount
+            const rowSize = 1
             if (matches(e.key, 'down')) {
                 setSelectedIndex(Math.min(selectedIndex + rowSize, episodes.length - 1))
                 e.preventDefault()
             } else if (matches(e.key, 'up')) {
                 setSelectedIndex(Math.max(selectedIndex - rowSize, 0))
-                e.preventDefault()
-            } else if (matches(e.key, 'right')) {
-                setSelectedIndex(Math.min(selectedIndex + 1, episodes.length - 1))
-                e.preventDefault()
-            } else if (matches(e.key, 'left')) {
-                setSelectedIndex(Math.max(selectedIndex - 1, 0))
                 e.preventDefault()
             } else if (matches(e.key, 'confirm')) {
                 const episode = episodes[selectedIndex]
@@ -282,7 +333,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                             </div>
                         )}
 
-                        <div className="episodes-grid" style={{ gridTemplateColumns: `repeat(${columnCount}, 1fr)` }}>
+                        <div className="episodes-list">
                             {loading ? (
                                 <p>Loading episodes...</p>
                             ) : episodes.length === 0 ? (
@@ -302,13 +353,13 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                     {episode.episodeNumber !== undefined ? `E${episode.episodeNumber}` : 'E?'}
                                                 </div>
                                             )}
-                                        </div>
-                                        <div className="episode-info">
-                                            <p className="episode-label">
-                                                Episode {episode.episodeNumber ?? idx + 1} - {episode.title || 'Untitled'}
-                                            </p>
-                                            {episode.overview && (
-                                                <p className="episode-description">{episode.overview}</p>
+                                            <div className="episode-play-badge" aria-hidden="true">
+                                                <span>▶</span>
+                                            </div>
+                                            {episode.watched && (
+                                                <div className="episode-watched-chip" aria-hidden="true">
+                                                    <CheckIcon />
+                                                </div>
                                             )}
                                             {episode.playedPercentage && episode.playedPercentage > 0 && !episode.watched && (
                                                 <div className="episode-progress-bar">
@@ -318,9 +369,44 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                     />
                                                 </div>
                                             )}
-                                            {episode.watched && (
-                                                <p className="episode-watched-badge">✓ Watched</p>
+                                        </div>
+                                        <div className="episode-info">
+                                            <p className="episode-label">
+                                                {episode.episodeNumber !== undefined
+                                                    ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
+                                                    : `${idx + 1}. ${episode.title || 'Untitled'}`}
+                                            </p>
+                                            <div className="episode-meta">
+                                                {episode.duration && (
+                                                    <span>{formatDuration(episode.duration)}</span>
+                                                )}
+                                                {episode.communityRating !== undefined && (
+                                                    <span className="episode-rating">
+                                                        <span className="rating-star">★</span>
+                                                        {episode.communityRating.toFixed(1)}
+                                                    </span>
+                                                )}
+                                                {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
+                                                    <span className="episode-status">Resume</span>
+                                                )}
+                                            </div>
+                                            {episode.overview && (
+                                                <p className="episode-description">{episode.overview}</p>
                                             )}
+                                        </div>
+                                        <div className="episode-actions" aria-hidden="true">
+                                            <span className="episode-action-icon">
+                                                <InfoIcon />
+                                            </span>
+                                            <span className="episode-action-icon">
+                                                <CheckIcon />
+                                            </span>
+                                            <span className="episode-action-icon">
+                                                <HeartIcon />
+                                            </span>
+                                            <span className="episode-action-icon">
+                                                <MoreIcon />
+                                            </span>
                                         </div>
                                     </div>
                                 ))

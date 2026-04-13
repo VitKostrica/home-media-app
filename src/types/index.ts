@@ -10,6 +10,7 @@ export interface MediaItem {
     backdropUrl?: string
     overview?: string
     duration?: number       // in seconds
+    communityRating?: number
     watched: boolean
     resumePosition?: number // in seconds
     playedPercentage?: number
