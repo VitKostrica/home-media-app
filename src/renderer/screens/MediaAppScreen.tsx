@@ -975,7 +975,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                                 {continueWatchingItems.map((item, index) => (
                                                     <div
                                                         key={item.id}
-                                                        className={`media-item-wrapper ${
+                                                        className={`media-item-wrapper continue-card ${
                                                             continueRow === 'continue' && continueIndex === index ? 'focused' : ''
                                                         }`}
                                                     >
