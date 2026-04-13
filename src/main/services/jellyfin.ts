@@ -104,6 +104,48 @@ function resolveItemPath(itemPath: string | undefined, itemType: MappedItem['typ
     return itemPath
 }
 
+const LOCAL_METADATA_ROOT = '/var/lib/jellyfin/metadata'
+const LOCAL_IMAGE_NAMES = ['poster.jpg', 'thumb.jpg', 'landscape.jpg', 'folder.jpg', 'primary.jpg']
+
+function uniquePaths(paths: Array<string | undefined>): string[] {
+    return [...new Set(paths.filter((value): value is string => !!value))]
+}
+
+function getLocalMetadataRoots(): string[] {
+    const config = getConfig()
+    return uniquePaths([
+        config.mediaBasePath ? path.join(config.mediaBasePath, 'metadata') : undefined,
+        config.moviesBasePath ? path.join(config.moviesBasePath, 'metadata') : undefined,
+        config.showsBasePath ? path.join(config.showsBasePath, 'metadata') : undefined,
+        LOCAL_METADATA_ROOT,
+    ])
+}
+
+function findLocalImagePath(itemId: string): string | undefined {
+    for (const root of getLocalMetadataRoots()) {
+        const candidateDirs = [
+            path.join(root, itemId),
+            path.join(root, 'metadata', itemId),
+            path.join(root, itemId, 'metadata'),
+        ]
+
+        for (const candidateDir of candidateDirs) {
+            for (const filename of LOCAL_IMAGE_NAMES) {
+                const candidate = path.join(candidateDir, filename)
+                if (fs.existsSync(candidate)) {
+                    return candidate
+                }
+            }
+        }
+    }
+
+    return undefined
+}
+
+function toLocalImageUrl(filePath: string): string {
+    return `local://${encodeURI(filePath)}`
+}
+
 // Jellyfin auth header
 const CLIENT_INFO = 'MediaBrowser Client="Home Media App", Device="Linux PC", DeviceId="home-media-app-electron", Version="0.1.0"'
 
@@ -180,7 +222,10 @@ function mapItem(item: JellyfinItem): MappedItem {
     const filePath = resolveItemPath(jellyfinPath, itemType)
 
     // Always use Jellyfin for poster images
-    let posterUrl = item.ImageTags?.Primary
+    const localPosterPath = findLocalImagePath(item.Id)
+    let posterUrl = localPosterPath
+        ? toLocalImageUrl(localPosterPath)
+        : item.ImageTags?.Primary
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
 
