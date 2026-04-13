@@ -231,8 +231,8 @@ function mapItem(item: JellyfinItem): MappedItem {
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
 
-    // For episodes and seasons, prefer series poster so cards match Movies/Shows visual style.
-    if (itemType === 'episode' || itemType === 'season') {
+    // For seasons, prefer the series poster. Episodes should keep their own artwork.
+    if (itemType === 'season') {
         if (item.SeriesId && item.SeriesPrimaryImageTag) {
             posterUrl = `${config.jellyfinUrl}/Items/${item.SeriesId}/Images/Primary?tag=${item.SeriesPrimaryImageTag}${token ? `&api_key=${token}` : ''}`
         } else if (item.ParentThumbItemId && item.ParentThumbImageTag) {
@@ -391,7 +391,7 @@ export async function getEpisodes(
             params: {
                 seasonId,
                 userId,
-                Fields: 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount,Overview',
+                Fields: 'ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount,Overview,ImageTags,RunTimeTicks,UserData,IndexNumber,ParentIndexNumber,SeriesName,SeasonName,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
             },
             headers: getHeaders(),
         })
