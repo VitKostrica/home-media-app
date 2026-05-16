@@ -20,12 +20,14 @@ declare global {
                 getSeries: () => Promise<any>
                 getSeasons: (seriesId: string) => Promise<any>
                 getEpisodes: (seriesId: string, seasonId: string) => Promise<any>
+                getItemDetails: (itemId: string) => Promise<any>
                 getResumeItems: () => Promise<any>
                 getNextUpItems: () => Promise<any>
                 getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
                 reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
                 reportProgress: (itemId: string, positionTicks: number, isPaused?: boolean) => Promise<void>
                 reportStopped: (itemId: string, positionTicks: number) => Promise<void>
+                markPlayed: (itemId: string) => Promise<void>
             }
             configApi: {
                 get: () => Promise<AppConfig>

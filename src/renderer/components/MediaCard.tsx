@@ -93,4 +93,12 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, isFocused = false, onSelect
     )
 }
 
-export default MediaCard
+function areEqual(prev: MediaCardProps, next: MediaCardProps): boolean {
+    return (
+        prev.item === next.item &&
+        prev.isFocused === next.isFocused &&
+        prev.showProgress === next.showProgress
+    )
+}
+
+export default React.memo(MediaCard, areEqual)

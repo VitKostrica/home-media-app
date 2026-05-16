@@ -39,7 +39,7 @@ function toGlobalShortcutAccelerator(key: string): string | null {
 }
 
 function registerBackShortcuts() {
-    for (const accelerator of ['BackSpace', 'BrowserBack']) {
+    for (const accelerator of ['BackSpace']) {
         globalShortcut.unregister(accelerator)
     }
 
@@ -213,6 +213,10 @@ ipcMain.handle('jellyfin:get-episodes', async (_, seriesId: string, seasonId: st
     return await jellyfinService.getEpisodes(seriesId, seasonId)
 })
 
+ipcMain.handle('jellyfin:get-item-details', async (_, itemId: string) => {
+    return await jellyfinService.getItemDetails(itemId)
+})
+
 ipcMain.handle('jellyfin:get-resume-items', async () => {
     return await jellyfinService.getResumeItems()
 })
@@ -238,6 +242,10 @@ ipcMain.handle('jellyfin:report-progress', async (_, itemId: string, positionTic
 
 ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTicks: number) => {
     await jellyfinService.reportStopped(itemId, positionTicks)
+})
+
+ipcMain.handle('jellyfin:mark-played', async (_, itemId: string) => {
+    await jellyfinService.reportStopped(itemId, 0, undefined, { markPlayed: true })
 })
 
 // ── Player IPC ───────────────────────────────────────────────
@@ -274,25 +282,33 @@ ipcMain.handle('player:subtitle-select', (_, _index: number) => {
 
 ipcMain.handle('file:get-local-image', async (_, itemId: string) => {
     const config = configService.getConfig()
-    if (!config.mediaBasePath) {
-        return null
-    }
+    const metadataRoots = [
+        config.mediaBasePath ? path.join(config.mediaBasePath, 'metadata') : '',
+        config.moviesBasePath ? path.join(config.moviesBasePath, 'metadata') : '',
+        config.showsBasePath ? path.join(config.showsBasePath, 'metadata') : '',
+        '/var/lib/jellyfin/metadata',
+    ].filter(Boolean)
 
-    // Try common metadata directory structures for Jellyfin
-    const possiblePaths = [
-        path.join(config.mediaBasePath, 'metadata', itemId, 'poster.jpg'),
-        path.join(config.mediaBasePath, 'metadata', itemId, 'thumb.jpg'),
-        path.join(config.mediaBasePath, 'metadata', itemId + '_poster.jpg'),
-        path.join(config.mediaBasePath, 'metadata', itemId + '_thumb.jpg'),
-    ]
+    const imageNames = ['poster.jpg', 'thumb.jpg', 'landscape.jpg', 'folder.jpg', 'primary.jpg']
 
-    for (const imagePath of possiblePaths) {
-        try {
-            if (fs.existsSync(imagePath)) {
-                return imagePath
+    for (const root of metadataRoots) {
+        const candidateDirs = [
+            path.join(root, itemId),
+            path.join(root, 'metadata', itemId),
+            path.join(root, itemId, 'metadata'),
+        ]
+
+        for (const candidateDir of candidateDirs) {
+            for (const imageName of imageNames) {
+                const imagePath = path.join(candidateDir, imageName)
+                try {
+                    if (fs.existsSync(imagePath)) {
+                        return imagePath
+                    }
+                } catch (err) {
+                    console.error('Error checking image path:', imagePath, err)
+                }
             }
-        } catch (err) {
-            console.error('Error checking image path:', imagePath, err)
         }
     }
 

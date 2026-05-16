@@ -4,12 +4,13 @@ import type { KeybindingsConfig } from './keybindings'
 export interface MediaItem {
     id: string
     title: string
-    type: 'movie' | 'series' | 'episode'
+    type: 'movie' | 'series' | 'season' | 'episode'
     year?: number
     posterUrl?: string
     backdropUrl?: string
     overview?: string
     duration?: number       // in seconds
+    communityRating?: number
     watched: boolean
     resumePosition?: number // in seconds
     playedPercentage?: number
@@ -81,12 +82,14 @@ export interface ElectronAPI {
         getSeries: () => Promise<MediaItem[]>
         getSeasons: (seriesId: string) => Promise<MediaItem[]>
         getEpisodes: (seriesId: string, seasonId: string) => Promise<MediaItem[]>
+        getItemDetails: (itemId: string) => Promise<MediaItem | null>
         getResumeItems: () => Promise<MediaItem[]>
         getNextUpItems: () => Promise<MediaItem[]>
         getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
         reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
         reportProgress: (itemId: string, positionTicks: number) => Promise<void>
         reportStopped: (itemId: string, positionTicks: number) => Promise<void>
+        markPlayed: (itemId: string) => Promise<void>
     }
     configApi: {
         get: () => Promise<AppConfig>

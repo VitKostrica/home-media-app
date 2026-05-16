@@ -9,7 +9,7 @@ import { isEffectivelyFinished } from '../utils/playbackProgress'
 interface MediaItem {
     id: string
     title: string
-    type: 'movie' | 'series' | 'episode'
+    type: 'movie' | 'series' | 'season' | 'episode'
     year?: number
     posterUrl?: string
     overview?: string
@@ -19,13 +19,30 @@ interface MediaItem {
     playedPercentage?: number
     filePath?: string
     seriesName?: string
+    seriesId?: string
     seasonNumber?: number
     episodeNumber?: number
+}
+
+interface ShowDetailTarget {
+    id: string
+    title: string
+    posterUrl?: string
+    overview?: string
+    year?: number
+    initialSeasonNumber?: number
+    initialEpisodeNumber?: number
 }
 
 interface MediaAppScreenProps {
     onNavigate: (screen: string) => void
 }
+
+type ActiveTab = 0 | 1 | 2
+type SidebarIndex = 0 | 1 | 2 | 3
+type FocusArea = 'sidebar' | 'content'
+type ContinueRow = 'continue' | 'next'
+type DetailFocus = 'play' | 'actions'
 
 const COLUMNS = 6
 const CONTINUE_WATCHING_ROW_LIMIT = 6
@@ -46,59 +63,191 @@ function formatTime(totalSeconds: number): string {
     return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function HomeIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 11.5L12 4l8 7.5" />
+            <path d="M6.5 10.5V20h11V10.5" />
+            <path d="M10 20v-6h4v6" />
+        </svg>
+    )
+}
+
+function ContinueIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l12-7z" />
+        </svg>
+    )
+}
+
+function MoviesIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="7" width="16" height="10" rx="2" />
+            <path d="M8 7l-2 4" />
+            <path d="M12 7l-2 4" />
+            <path d="M16 7l-2 4" />
+            <path d="M20 7l-2 4" />
+            <path d="M4 11h16" />
+        </svg>
+    )
+}
+
+function ShowsIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="6" width="16" height="10" rx="2" />
+            <path d="M8 18h8" />
+            <path d="M12 16v2" />
+            <path d="M9 10h6" />
+            <path d="M7 6.5h10" />
+        </svg>
+    )
+}
+
+function PlayIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l12-7z" />
+        </svg>
+    )
+}
+
+function SeenIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" />
+            <circle cx="12" cy="12" r="9" />
+        </svg>
+    )
+}
+
+function RestartIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12a7 7 0 1 0 2-4.9" />
+            <path d="M4 4v5h5" />
+        </svg>
+    )
+}
+
+function PreviousEpisodeIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 6v12" />
+            <path d="M18 6l-8 6 8 6z" />
+        </svg>
+    )
+}
+
+function NextEpisodeIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 6v12" />
+            <path d="M6 6l8 6-8 6z" />
+        </svg>
+    )
+}
+
+function OpenShowIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="14" rx="2" />
+            <path d="M7 9h10" />
+            <path d="M7 13h6" />
+        </svg>
+    )
+}
+
 const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
-    // State
-    const [activeTab, setActiveTab] = useState<number>(0) // 0 = Continue Watching, 1 = Movies, 2 = Shows
+    const [activeTab, setActiveTab] = useState<ActiveTab>(0)
     const [items, setItems] = useState<MediaItem[]>([])
     const [loading, setLoading] = useState<boolean>(true)
     const [error, setError] = useState<string | null>(null)
+    const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
+    const [nextUpItems, setNextUpItems] = useState<MediaItem[]>([])
+    const [sidebarIndex, setSidebarIndex] = useState<SidebarIndex>(1)
+    const [focusedArea, setFocusedArea] = useState<FocusArea>('content')
+    const [continueRow, setContinueRow] = useState<ContinueRow>('continue')
+    const [continueIndex, setContinueIndex] = useState<number>(0)
     const [gridIndex, setGridIndex] = useState<number>(0)
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+    const [vlcPlayingItem, setVlcPlayingItem] = useState<MediaItem | null>(null)
     const [showDetail, setShowDetail] = useState<boolean>(false)
     const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
     const [showShowDetail, setShowShowDetail] = useState<boolean>(false)
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
-    const [vlcPlayingItem, setVlcPlayingItem] = useState<MediaItem | null>(null)
-    const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
-    const [nextUpItems, setNextUpItems] = useState<MediaItem[]>([])
+    const [detailFocus, setDetailFocus] = useState<DetailFocus>('play')
+    const [detailActionIndex, setDetailActionIndex] = useState<number>(0)
+    const [episodeNavigation, setEpisodeNavigation] = useState<MediaItem[]>([])
+    const [episodeNavigationLoading, setEpisodeNavigationLoading] = useState<boolean>(false)
+    const [showDetailTarget, setShowDetailTarget] = useState<ShowDetailTarget | null>(null)
     const { matches } = useKeybindings()
 
-    const gridRef = useRef<HTMLDivElement>(null)
+    const contentRef = useRef<HTMLDivElement>(null)
     const skipNextAutoRefreshRef = useRef(false)
+    const fetchRequestIdRef = useRef(0)
+    const playbackResolutionRequestRef = useRef(0)
+    const seriesPosterCacheRef = useRef<Map<string, string | undefined>>(new Map())
+
+    const focusContinueWatching = useCallback((row: ContinueRow = 'continue', index: number = 0) => {
+        setActiveTab(0)
+        setFocusedArea('content')
+        setContinueRow(row)
+        setContinueIndex(index)
+    }, [])
+
+    const focusGrid = useCallback((tab: Exclude<ActiveTab, 0>, index: number = 0) => {
+        setActiveTab(tab)
+        setFocusedArea('content')
+        setGridIndex(index)
+    }, [])
 
     const fetchItems = useCallback(
-        async (tabIndex: number = activeTab, options?: { retryNextUp?: boolean }) => {
+        async (tabIndex: ActiveTab, options?: { retryNextUp?: boolean }) => {
+            const requestId = ++fetchRequestIdRef.current
             setLoading(true)
             setError(null)
             try {
                 const config = await window.electron?.configApi?.get()
+                if (requestId !== fetchRequestIdRef.current) {
+                    return
+                }
                 if (!config?.jellyfinApiKey || !config?.jellyfinUserId) {
                     setIsAuthenticated(false)
                     setItems([])
-                    setLoading(false)
                     return
                 }
 
                 const api = window.electron?.jellyfinApi
                 if (!api) {
                     setError('Electron API not available')
-                    setLoading(false)
                     return
                 }
 
                 let data: MediaItem[] = []
 
                 if (tabIndex === 0) {
-                    // Continue Watching tab: refresh Resume + Next Up each visit
                     const resumeItems = await api.getResumeItems()
+                    if (requestId !== fetchRequestIdRef.current) {
+                        return
+                    }
                     let nextUpItems = await api.getNextUpItems()
-
-                    if (options?.retryNextUp && nextUpItems.length === 0) {
-                        console.log('[Continue Watching] Next Up empty, retrying once after a short delay')
-                        await sleep(NEXT_UP_RETRY_DELAY_MS)
-                        nextUpItems = await api.getNextUpItems()
+                    if (requestId !== fetchRequestIdRef.current) {
+                        return
                     }
 
-                    console.log(`[Continue Watching] resume=${resumeItems?.length || 0}, nextUp=${nextUpItems?.length || 0}`)
+                    if (options?.retryNextUp && nextUpItems.length === 0) {
+                        await sleep(NEXT_UP_RETRY_DELAY_MS)
+                        if (requestId !== fetchRequestIdRef.current) {
+                            return
+                        }
+                        nextUpItems = await api.getNextUpItems()
+                        if (requestId !== fetchRequestIdRef.current) {
+                            return
+                        }
+                    }
+
                     const resumeUnique = (resumeItems || []).filter(
                         (item) => item?.id && !isEffectivelyFinished(item)
                     )
@@ -106,66 +255,138 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     const nextUpUnique = (nextUpItems || []).filter(
                         (item) => item?.id && !seenIds.has(item.id)
                     )
-                    console.log(
-                        `[Continue Watching] unique resume=${resumeUnique.length}, unique nextUp=${nextUpUnique.length}`
+
+                    const episodeItems = [...resumeUnique, ...nextUpUnique].filter(
+                        (item) => item.type === 'episode' && !!(item as { seriesId?: string }).seriesId
+                    ) as MediaItem[]
+                    const uniqueSeriesIds = [
+                        ...new Set(
+                            episodeItems
+                                .map((item) => item.seriesId)
+                                .filter((seriesId): seriesId is string => !!seriesId)
+                        ),
+                    ]
+                    const seriesPosters = new Map<string, string | undefined>()
+
+                    await Promise.all(
+                        uniqueSeriesIds.map(async (seriesId) => {
+                            const posterUrl = await resolveSeriesPoster(seriesId)
+                            seriesPosters.set(seriesId, posterUrl)
+                        })
                     )
 
-                    const continueRow = resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT)
-                    const nextUpRow = nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT)
+                    const attachSeriesPoster = (list: MediaItem[]) =>
+                        list.map((item) => {
+                            if (item.type !== 'episode' || !item.seriesId) {
+                                return item
+                            }
 
-                    setContinueWatchingItems(continueRow)
-                    setNextUpItems(nextUpRow)
-                    data = [...continueRow, ...nextUpRow]
+                            return {
+                                ...item,
+                                posterUrl: seriesPosters.get(item.seriesId) ?? item.posterUrl,
+                            }
+                        })
+
+                    const continueRowItems = attachSeriesPoster(resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT))
+                    const nextUpRowItems = attachSeriesPoster(nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT))
+
+                    setContinueWatchingItems(continueRowItems)
+                    setNextUpItems(nextUpRowItems)
+                    data = [...continueRowItems, ...nextUpRowItems]
                 } else if (tabIndex === 1) {
-                    // Movies tab
                     data = await api.getMovies()
                     setContinueWatchingItems([])
                     setNextUpItems([])
                 } else {
-                    // Shows tab
                     data = await api.getSeries()
                     setContinueWatchingItems([])
                     setNextUpItems([])
                 }
 
+                if (requestId !== fetchRequestIdRef.current) {
+                    return
+                }
                 setItems(data || [])
-                setGridIndex(0)
             } catch (err: unknown) {
+                if (requestId !== fetchRequestIdRef.current) {
+                    return
+                }
                 const message = err instanceof Error ? err.message : 'Failed to load library'
                 setError(message)
             } finally {
-                setLoading(false)
+                if (requestId === fetchRequestIdRef.current) {
+                    setLoading(false)
+                }
             }
         },
-        [activeTab]
+        []
     )
 
-    // Check auth status on mount
+    const resolvePlayableItem = useCallback(async (item: MediaItem): Promise<MediaItem | null> => {
+        if (item.filePath) {
+            return item
+        }
+
+        const requestId = ++playbackResolutionRequestRef.current
+        const api = window.electron?.jellyfinApi
+        if (!api) {
+            return null
+        }
+
+        const details = await api.getItemDetails(item.id)
+        if (requestId !== playbackResolutionRequestRef.current) {
+            return null
+        }
+
+        if (!details?.filePath) {
+            return details ? { ...item, ...details } : null
+        }
+
+        return {
+            ...item,
+            ...details,
+            filePath: details.filePath,
+            type: item.type,
+        }
+    }, [])
+
+    const resolveSeriesPoster = useCallback(async (seriesId: string): Promise<string | undefined> => {
+        if (seriesPosterCacheRef.current.has(seriesId)) {
+            return seriesPosterCacheRef.current.get(seriesId)
+        }
+
+        const api = window.electron?.jellyfinApi
+        const details = api ? await api.getItemDetails(seriesId) : null
+        const posterUrl = details?.posterUrl
+        seriesPosterCacheRef.current.set(seriesId, posterUrl)
+        return posterUrl
+    }, [])
+
     useEffect(() => {
         checkAuth()
     }, [])
 
-    // Fetch items when tab changes or auth status changes
     useEffect(() => {
-        if (isAuthenticated) {
-            if (skipNextAutoRefreshRef.current && activeTab === 0) {
-                skipNextAutoRefreshRef.current = false
-                return
-            }
-            void fetchItems(activeTab)
+        if (!isAuthenticated) {
+            return
         }
+
+        if (skipNextAutoRefreshRef.current && activeTab === 0) {
+            skipNextAutoRefreshRef.current = false
+            return
+        }
+
+        void fetchItems(activeTab)
     }, [activeTab, isAuthenticated, fetchItems])
 
-    // Listen for player stopped event (from global backspace shortcut)
     useEffect(() => {
         const handlePlayerStopped = () => {
-            console.log('Player stopped - clearing VLC overlay and refreshing continue watching')
             setVlcPlayingItem(null)
+            closeDetailViews()
             skipNextAutoRefreshRef.current = true
+            setFocusedArea('content')
+            focusContinueWatching('continue', 0)
             void fetchItems(0, { retryNextUp: true })
-            if (activeTab !== 0) {
-                setActiveTab(0) // Switch to Continue Watching tab
-            }
         }
 
         if (window.electron) {
@@ -177,7 +398,118 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 window.electron.off?.('player:stopped', handlePlayerStopped)
             }
         }
-    }, [activeTab, fetchItems])
+    }, [closeDetailViews, fetchItems, focusContinueWatching])
+
+    useEffect(() => {
+        if (!isAuthenticated || loading || error) {
+            return
+        }
+
+        if (activeTab === 0) {
+            if (continueRow === 'continue' && continueWatchingItems.length > 0) {
+                setContinueIndex((prev) => Math.min(prev, Math.max(continueWatchingItems.length - 1, 0)))
+            } else if (continueRow === 'next' && nextUpItems.length > 0) {
+                setContinueIndex((prev) => Math.min(prev, Math.max(nextUpItems.length - 1, 0)))
+            } else if (continueWatchingItems.length > 0) {
+                setContinueRow('continue')
+                setContinueIndex(0)
+            } else if (nextUpItems.length > 0) {
+                setContinueRow('next')
+                setContinueIndex(0)
+            }
+            return
+        }
+
+        if (items.length > 0) {
+            setGridIndex((prev) => Math.min(prev, Math.max(items.length - 1, 0)))
+        }
+    }, [
+        activeTab,
+        continueRow,
+        continueWatchingItems.length,
+        error,
+        isAuthenticated,
+        items.length,
+        loading,
+        nextUpItems.length,
+    ])
+
+    useEffect(() => {
+        if (!showDetail) {
+            setDetailFocus('play')
+            setDetailActionIndex(0)
+            setEpisodeNavigation([])
+            setEpisodeNavigationLoading(false)
+            return
+        }
+
+        setDetailFocus('play')
+        setDetailActionIndex(0)
+    }, [selectedItem?.id, showDetail])
+
+    useEffect(() => {
+        let cancelled = false
+
+        const loadEpisodeNavigation = async () => {
+            if (!showDetail || !selectedItem || selectedItem.type !== 'episode' || !selectedItem.seriesId) {
+                setEpisodeNavigation([])
+                setEpisodeNavigationLoading(false)
+                return
+            }
+
+            setEpisodeNavigationLoading(true)
+            try {
+                const api = window.electron?.jellyfinApi
+                const seasons = (await api?.getSeasons(selectedItem.seriesId)) || []
+                const seasonEpisodeLists = await Promise.all(
+                    seasons
+                        .filter((season) => !!season.id)
+                        .map((season) => api?.getEpisodes(selectedItem.seriesId || '', season.id) || [])
+                )
+
+                const flattenedEpisodes = seasonEpisodeLists
+                    .flat()
+                    .filter((episode): episode is MediaItem => Boolean(episode?.id))
+                    .sort((left, right) => {
+                        const leftSeason = left.seasonNumber ?? 0
+                        const rightSeason = right.seasonNumber ?? 0
+                        if (leftSeason !== rightSeason) {
+                            return leftSeason - rightSeason
+                        }
+                        return (left.episodeNumber ?? 0) - (right.episodeNumber ?? 0)
+                    })
+
+                if (!cancelled) {
+                    setEpisodeNavigation(flattenedEpisodes)
+                }
+            } catch {
+                if (!cancelled) {
+                    setEpisodeNavigation([])
+                }
+            } finally {
+                if (!cancelled) {
+                    setEpisodeNavigationLoading(false)
+                }
+            }
+        }
+
+        void loadEpisodeNavigation()
+
+        return () => {
+            cancelled = true
+        }
+    }, [selectedItem?.id, selectedItem?.seriesId, selectedItem?.type, showDetail])
+
+    useEffect(() => {
+        if (focusedArea !== 'content' || activeTab === 0 || !contentRef.current) {
+            return
+        }
+
+        const focused = contentRef.current.querySelector('.media-card.focused')
+        if (focused) {
+            focused.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
+        }
+    }, [activeTab, focusedArea, gridIndex])
 
     const checkAuth = async () => {
         try {
@@ -194,175 +526,521 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         }
     }
 
-    const openItem = (item: MediaItem) => {
-        setSelectedItem(item)
-        if (item.type === 'series') {
-            setShowShowDetail(true)
-        } else {
-            setShowDetail(true)
-        }
-    }
-
     const launchVlc = useCallback(async (item: MediaItem) => {
-        console.log('Playing item:', item)
-        console.log('File path:', item.filePath)
-        console.log('Resume position:', item.resumePosition)
-
-        if (!item.filePath) {
-            console.warn('No file path for selected item')
-            alert('No file path available for this item')
+        const playableItem = await resolvePlayableItem(item)
+        if (!playableItem?.filePath) {
+            alert('File path not available')
             return
         }
 
+        const startPosition = playableItem.resumePosition ? Math.floor(playableItem.resumePosition / 10000000) : 0
+
         try {
-            const startPosition = item.resumePosition || 0
-
-            console.log('Launching VLC with:', {
-                filePath: item.filePath,
-                startPosition,
-                itemId: item.id,
-            })
-
             const result = await window.electron?.playerApi?.launch(
                 'vlc',
-                item.filePath,
+                playableItem.filePath,
                 startPosition,
-                item.id,
-                item.duration
+                playableItem.id,
+                playableItem.duration
             )
-
-            console.log('VLC launch result:', result)
-
             if (result?.success) {
-                setVlcPlayingItem(item)
-                setShowDetail(false)
+                setVlcPlayingItem(playableItem)
             } else {
                 alert(`Failed to launch VLC: ${result?.error || 'Unknown error'}`)
             }
-        } catch (err) {
-            console.error('Failed to launch player:', err)
-            alert('Error launching player')
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to play media'
+            alert(`Error: ${message}`)
         }
-    }, [])
+    }, [resolvePlayableItem])
 
     const handlePlay = useCallback(async () => {
-        if (!selectedItem?.filePath) {
-            console.warn('No file path for selected item')
+        if (!selectedItem) {
             return
         }
 
         await launchVlc(selectedItem)
     }, [launchVlc, selectedItem])
 
-    // ── Keyboard Navigation ──────────────────────────────────
+    const handleClosePlayer = useCallback(async () => {
+        try {
+            await window.electron?.playerApi?.stop()
+        } catch {
+            // Ignore stop errors
+        }
+        setVlcPlayingItem(null)
+    }, [])
 
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            // Don't intercept keys when VLC is playing
+    function closeDetailViews() {
+        setShowDetail(false)
+        setShowShowDetail(false)
+        setShowDetailTarget(null)
+        setSelectedItem(null)
+        setEpisodeNavigation([])
+        setDetailFocus('play')
+        setDetailActionIndex(0)
+    }
+
+    const refreshCurrentView = useCallback(() => {
+        void fetchItems(activeTab, activeTab === 0 ? { retryNextUp: true } : undefined)
+    }, [activeTab, fetchItems])
+
+    const openItem = useCallback((item: MediaItem) => {
+        setSelectedItem(item)
+        if (item.type === 'series') {
+            setShowDetailTarget(item)
+            setShowShowDetail(true)
+        } else {
+            setShowDetail(true)
+        }
+    }, [])
+
+    const openShowDetail = useCallback(() => {
+        if (!selectedItem) {
+            return
+        }
+
+        const target: ShowDetailTarget =
+            selectedItem.type === 'episode' && selectedItem.seriesId
+                ? {
+                      id: selectedItem.seriesId,
+                      title: selectedItem.seriesName || selectedItem.title,
+                      posterUrl: selectedItem.posterUrl,
+                      overview: selectedItem.overview,
+                      year: selectedItem.year,
+                      initialSeasonNumber: selectedItem.seasonNumber,
+                      initialEpisodeNumber: selectedItem.episodeNumber,
+                  }
+                : {
+                      id: selectedItem.id,
+                      title: selectedItem.title,
+                      posterUrl: selectedItem.posterUrl,
+                      overview: selectedItem.overview,
+                      year: selectedItem.year,
+                  }
+
+        setShowDetail(false)
+        setShowDetailTarget(target)
+        setShowShowDetail(true)
+    }, [selectedItem])
+
+    const markSelectedAsSeen = useCallback(async () => {
+        if (!selectedItem) {
+            return
+        }
+
+        try {
+            await window.electron?.jellyfinApi?.markPlayed(selectedItem.id)
+            closeDetailViews()
+            refreshCurrentView()
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to mark item as seen'
+            alert(`Error: ${message}`)
+        }
+    }, [closeDetailViews, refreshCurrentView, selectedItem])
+
+    const restartSelectedItem = useCallback(async () => {
+        if (!selectedItem) {
+            return
+        }
+
+        try {
+            await launchVlc({
+                ...selectedItem,
+                resumePosition: 0,
+            })
+        } catch {
+            // launchVlc already reports errors
+        }
+    }, [launchVlc, selectedItem])
+
+    const getAdjacentEpisode = useCallback(
+        (direction: 'previous' | 'next'): MediaItem | null => {
+            if (!selectedItem || selectedItem.type !== 'episode' || episodeNavigation.length === 0) {
+                return null
+            }
+
+            const currentIndex = episodeNavigation.findIndex((item) => item.id === selectedItem.id)
+            if (currentIndex < 0) {
+                return null
+            }
+
+            const targetIndex = direction === 'previous' ? currentIndex - 1 : currentIndex + 1
+            if (targetIndex < 0 || targetIndex >= episodeNavigation.length) {
+                return null
+            }
+
+            return episodeNavigation[targetIndex] || null
+        },
+        [episodeNavigation, selectedItem]
+    )
+
+    const playAdjacentEpisode = useCallback(
+        async (direction: 'previous' | 'next') => {
+            const target = getAdjacentEpisode(direction)
+            if (!target) {
+                return
+            }
+
+            await launchVlc(target)
+        },
+        [getAdjacentEpisode, launchVlc]
+    )
+
+    const getDetailActions = useCallback(() => {
+        if (!selectedItem) {
+            return []
+        }
+
+        const actions: Array<{
+            key: string
+            label: string
+            icon: React.FC
+            onSelect: () => void | Promise<void>
+            disabled?: boolean
+        }> = [
+            {
+                key: 'mark-seen',
+                label: 'Mark as seen',
+                icon: SeenIcon,
+                onSelect: () => { void markSelectedAsSeen() },
+            },
+            {
+                key: 'restart',
+                label: 'Restart',
+                icon: RestartIcon,
+                onSelect: () => { void restartSelectedItem() },
+            },
+        ]
+
+        if (selectedItem.type === 'episode') {
+            const previousEpisode = getAdjacentEpisode('previous')
+            const nextEpisode = getAdjacentEpisode('next')
+            actions.push(
+                {
+                    key: 'previous-episode',
+                    label: 'Previous episode',
+                    icon: PreviousEpisodeIcon,
+                    onSelect: () => { void playAdjacentEpisode('previous') },
+                    disabled: episodeNavigationLoading || !previousEpisode,
+                },
+                {
+                    key: 'next-episode',
+                    label: 'Next episode',
+                    icon: NextEpisodeIcon,
+                    onSelect: () => { void playAdjacentEpisode('next') },
+                    disabled: episodeNavigationLoading || !nextEpisode,
+                },
+                {
+                    key: 'open-show',
+                    label: 'Open show',
+                    icon: OpenShowIcon,
+                    onSelect: () => { void openShowDetail() },
+                }
+            )
+        }
+
+        return actions
+    }, [
+        episodeNavigationLoading,
+        getAdjacentEpisode,
+        markSelectedAsSeen,
+        playAdjacentEpisode,
+        restartSelectedItem,
+        openShowDetail,
+        selectedItem,
+    ])
+
+    const activateSidebarItem = useCallback(
+        (index: SidebarIndex) => {
+            setSidebarIndex(index)
+
+            if (index === 0) {
+                onNavigate('home')
+                return
+            }
+
+            if (index === 1) {
+                focusContinueWatching('continue', 0)
+                return
+            }
+
+            if (index === 2) {
+                focusGrid(1, 0)
+                return
+            }
+
+            focusGrid(2, 0)
+        },
+        [focusContinueWatching, focusGrid, onNavigate]
+    )
+
+    const handleKeyDown = useCallback(
+        (event: KeyboardEvent) => {
             if (vlcPlayingItem) {
                 if (matches(event.key, 'back')) {
-                    // Allow closing VLC with Backspace
                     event.preventDefault()
-                    window.electron?.playerApi?.stop()
-                    setVlcPlayingItem(null)
-
-                    // Refresh continue watching list and go back to it
-                    setActiveTab(0) // Switch to Continue Watching tab
+                    void handleClosePlayer()
                 }
                 return
             }
 
-            // Don't intercept keys when typing in input fields
+            if (showDetail) {
+                if (matches(event.key, 'back')) {
+                    event.preventDefault()
+                    closeDetailViews()
+                    return
+                }
+
+                const detailActions = getDetailActions()
+                const actionableIndexes = detailActions
+                    .map((action, index) => (action.disabled ? -1 : index))
+                    .filter((index) => index >= 0)
+
+                if (matches(event.key, 'down')) {
+                    event.preventDefault()
+                    if (detailFocus === 'play' && actionableIndexes.length > 0) {
+                        setDetailFocus('actions')
+                        setDetailActionIndex(0)
+                    }
+                    return
+                }
+
+                if (matches(event.key, 'up')) {
+                    event.preventDefault()
+                    if (detailFocus === 'actions') {
+                        setDetailFocus('play')
+                    }
+                    return
+                }
+
+                if (detailFocus === 'actions') {
+                    if (matches(event.key, 'left')) {
+                        event.preventDefault()
+                        setDetailActionIndex((prev) => Math.max(0, prev - 1))
+                        return
+                    }
+
+                    if (matches(event.key, 'right')) {
+                        event.preventDefault()
+                        setDetailActionIndex((prev) => Math.min(actionableIndexes.length - 1, prev + 1))
+                        return
+                    }
+
+                    if (matches(event.key, 'confirm')) {
+                        event.preventDefault()
+                        const currentAction = detailActions[actionableIndexes[detailActionIndex]]
+                        if (currentAction && !currentAction.disabled) {
+                            currentAction.onSelect()
+                        }
+                        return
+                    }
+                    return
+                }
+
+                if (matches(event.key, 'confirm')) {
+                    event.preventDefault()
+                    void handlePlay()
+                }
+                return
+            }
+
+            if (showShowDetail) {
+                if (matches(event.key, 'back')) {
+                    event.preventDefault()
+                    closeDetailViews()
+                }
+                return
+            }
+
             const tag = (event.target as HTMLElement)?.tagName
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
                 return
             }
 
-            // Don't intercept when login form is shown
             if (!isAuthenticated) {
                 return
             }
 
-            event.preventDefault()
+            if (matches(event.key, 'back')) {
+                event.preventDefault()
+                onNavigate('home')
+                return
+            }
 
-            // Detail overlay mode
-            if (showDetail) {
-                if (matches(event.key, 'confirm')) {
-                    handlePlay()
+            const safeGridIndex = Math.min(gridIndex, Math.max(items.length - 1, 0))
+
+            if (focusedArea === 'sidebar') {
+                if (matches(event.key, 'up')) {
+                    event.preventDefault()
+                    setSidebarIndex((prev) => Math.max(0, prev - 1) as SidebarIndex)
                     return
                 }
-                if (matches(event.key, 'back')) {
-                    setShowDetail(false)
-                    setSelectedItem(null)
+                if (matches(event.key, 'down')) {
+                    event.preventDefault()
+                    setSidebarIndex((prev) => Math.min(3, prev + 1) as SidebarIndex)
+                    return
+                }
+                if (matches(event.key, 'left')) {
+                    event.preventDefault()
+                    return
+                }
+                if (matches(event.key, 'right')) {
+                    event.preventDefault()
+                    setFocusedArea('content')
+                    return
+                }
+                if (matches(event.key, 'confirm')) {
+                    event.preventDefault()
+                    activateSidebarItem(sidebarIndex)
                 }
                 return
             }
 
-            // Grid browsing mode
             if (matches(event.key, 'left')) {
-                if (gridIndex > 0) {
-                    setGridIndex(prev => prev - 1)
+                event.preventDefault()
+                if (activeTab === 0) {
+                    if (continueIndex > 0) {
+                        setContinueIndex((prev) => Math.max(0, prev - 1))
+                    } else {
+                        setFocusedArea('sidebar')
+                        setSidebarIndex(1)
+                    }
+                    return
                 }
-                return
-            }
-            if (matches(event.key, 'right')) {
-                if (gridIndex < items.length - 1) {
-                    setGridIndex(prev => prev + 1)
-                }
-                return
-            }
-            if (matches(event.key, 'up')) {
-                const newIdx = gridIndex - COLUMNS
-                if (newIdx >= 0) {
-                    setGridIndex(newIdx)
-                }
-                return
-            }
-            if (matches(event.key, 'down')) {
-                const newIdx = gridIndex + COLUMNS
-                if (newIdx < items.length) {
-                    setGridIndex(newIdx)
-                }
-                return
-            }
-            if (matches(event.key, 'confirm')) {
-                if (items[gridIndex]) {
-                    openItem(items[gridIndex])
-                }
-                return
-            }
-            if (matches(event.key, 'back')) {
-                onNavigate('home')
-            }
-        }
 
+                if (items.length > 0 && safeGridIndex % COLUMNS !== 0) {
+                    setGridIndex((prev) => Math.max(0, prev - 1))
+                } else {
+                    setFocusedArea('sidebar')
+                    setSidebarIndex(activeTab === 1 ? 2 : 3)
+                }
+                return
+            }
+
+            if (activeTab === 0) {
+                const currentList = continueRow === 'continue' ? continueWatchingItems : nextUpItems
+                const currentMax = Math.max(currentList.length - 1, 0)
+                const safeIndex = Math.min(continueIndex, currentMax)
+
+                if (matches(event.key, 'right')) {
+                    event.preventDefault()
+                    if (currentList.length > 0 && safeIndex < currentMax) {
+                        setContinueIndex(safeIndex + 1)
+                    }
+                    return
+                }
+
+                if (matches(event.key, 'down')) {
+                    event.preventDefault()
+                    if (continueRow === 'continue' && nextUpItems.length > 0) {
+                        setContinueRow('next')
+                        setContinueIndex(0)
+                    }
+                    return
+                }
+
+                if (matches(event.key, 'up')) {
+                    event.preventDefault()
+                    if (continueRow === 'next' && continueWatchingItems.length > 0) {
+                        setContinueRow('continue')
+                        setContinueIndex(0)
+                    }
+                    return
+                }
+
+                if (matches(event.key, 'confirm')) {
+                    event.preventDefault()
+                    const item = currentList[safeIndex]
+                    if (item) {
+                        void launchVlc(item)
+                    }
+                    return
+                }
+                return
+            }
+
+            if (matches(event.key, 'right')) {
+                event.preventDefault()
+                if (safeGridIndex < items.length - 1) {
+                    setGridIndex(safeGridIndex + 1)
+                }
+                return
+            }
+
+            if (matches(event.key, 'down')) {
+                event.preventDefault()
+                const newIndex = safeGridIndex + COLUMNS
+                if (newIndex < items.length) {
+                    setGridIndex(newIndex)
+                }
+                return
+            }
+
+            if (matches(event.key, 'up')) {
+                event.preventDefault()
+                const newIndex = safeGridIndex - COLUMNS
+                if (newIndex >= 0) {
+                    setGridIndex(newIndex)
+                }
+                return
+            }
+
+            if (matches(event.key, 'confirm')) {
+                event.preventDefault()
+                const item = items[safeGridIndex]
+                if (item) {
+                    openItem(item)
+                }
+            }
+        },
+        [
+            activeTab,
+            continueIndex,
+            continueRow,
+            continueWatchingItems,
+            focusedArea,
+            gridIndex,
+            handleClosePlayer,
+            handlePlay,
+            isAuthenticated,
+            items,
+            launchVlc,
+            matches,
+            nextUpItems,
+            onNavigate,
+            showDetail,
+            showShowDetail,
+            sidebarIndex,
+            vlcPlayingItem,
+            openItem,
+        ]
+    )
+
+    useEffect(() => {
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [gridIndex, items, showDetail, handlePlay, onNavigate, isAuthenticated, vlcPlayingItem, matches])
+    }, [handleKeyDown])
 
-    // Scroll focused card into view
+    const sidebarItems = [
+        { label: 'Home', icon: HomeIcon },
+        { label: 'Continue Watching', icon: ContinueIcon },
+        { label: 'Movies', icon: MoviesIcon },
+        { label: 'Shows', icon: ShowsIcon },
+    ]
+
+    const detailActions = getDetailActions()
+
     useEffect(() => {
-        if (gridRef.current) {
-            const focused = gridRef.current.querySelector('.media-card.focused')
-            if (focused) {
-                focused.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-            }
+        if (detailFocus === 'actions' && detailActionIndex > Math.max(detailActions.length - 1, 0)) {
+            setDetailActionIndex(0)
         }
-    }, [gridIndex])
+    }, [detailActionIndex, detailActions.length, detailFocus])
 
-    // Tab switching
-    const handleTabSwitch = (tabIndex: number) => {
-        if (tabIndex !== activeTab) {
-            setActiveTab(tabIndex)
-            setGridIndex(0)
-        } else if (tabIndex === 0) {
-            void fetchItems(0, { retryNextUp: true })
-        }
+    if (!isAuthenticated) {
+        return <JellyfinLogin onSuccess={() => setIsAuthenticated(true)} />
     }
 
-    // ── Render ────────────────────────────────────────────────
-
-    // Show VLC playing overlay
     if (vlcPlayingItem) {
         return (
             <div className="vlc-playing-overlay">
@@ -377,138 +1055,167 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
     return (
         <div className="media-app-screen">
-            {/* Header */}
-            <div className="media-app-header">
-                <button className="back-button" onClick={() => onNavigate('home')}>
-                    ← Home
-                </button>
-                <h1 className="media-app-title">Custom Media</h1>
-                <div className="header-spacer" />
-            </div>
+            <div className="media-app-shell">
+                <aside className="media-sidebar" aria-label="Media navigation">
+                    <button
+                        className={`sidebar-button sidebar-home ${
+                            focusedArea === 'sidebar' && sidebarIndex === 0 ? 'focused' : ''
+                        }`}
+                        onClick={() => activateSidebarItem(0)}
+                        aria-label="Home"
+                    >
+                        <HomeIcon />
+                        <span className="sr-only">Home</span>
+                    </button>
 
-            {/* Category Tabs */}
-            <div className="category-tabs">
-                <button
-                    className={`category-tab ${activeTab === 0 ? 'active' : ''}`}
-                    onClick={() => handleTabSwitch(0)}
-                >
-                    Continue Watching
-                </button>
-                <button
-                    className={`category-tab ${activeTab === 1 ? 'active' : ''}`}
-                    onClick={() => handleTabSwitch(1)}
-                >
-                    Movies
-                </button>
-                <button
-                    className={`category-tab ${activeTab === 2 ? 'active' : ''}`}
-                    onClick={() => handleTabSwitch(2)}
-                >
-                    Shows
-                </button>
-            </div>
+                    <div className="sidebar-divider" />
 
-            {/* Content Area */}
-            <div className={`media-content ${activeTab === 0 ? 'continue-watching-view' : ''}`} ref={gridRef}>
-                {/* Loading State */}
-                {loading && (
-                    <div className="media-state-message">
-                        <div className="loading-spinner" />
-                        <p>Loading library...</p>
+                    <div className="sidebar-nav">
+                        {sidebarItems.slice(1).map((item, index) => {
+                            const actualIndex = (index + 1) as SidebarIndex
+                            const isFocused = focusedArea === 'sidebar' && sidebarIndex === actualIndex
+                            const isActive =
+                                (actualIndex === 1 && activeTab === 0) ||
+                                (actualIndex === 2 && activeTab === 1) ||
+                                (actualIndex === 3 && activeTab === 2)
+
+                            return (
+                                <button
+                                    key={item.label}
+                                    className={`sidebar-button ${isFocused ? 'focused' : ''} ${
+                                        isActive ? 'active' : ''
+                                    }`}
+                                    onClick={() => activateSidebarItem(actualIndex)}
+                                    aria-label={item.label}
+                                >
+                                    <item.icon />
+                                    <span className="sr-only">{item.label}</span>
+                                </button>
+                            )
+                        })}
                     </div>
-                )}
 
-                {/* Not Authenticated – show login form */}
-                {!loading && !isAuthenticated && (
-                    <JellyfinLogin onSuccess={() => setIsAuthenticated(true)} />
-                )}
-
-                {/* Error State */}
-                {!loading && error && (
-                    <div className="media-state-message">
-                        <div className="state-icon">⚠</div>
-                        <h2>Something went wrong</h2>
-                        <p className="state-hint">{error}</p>
-                        <button className="retry-button" onClick={() => { void fetchItems(activeTab) }}>
-                            Retry
-                        </button>
+                    <div className="sidebar-bottom">
+                        <p>Back</p>
+                        <span>Enter</span>
                     </div>
-                )}
+                </aside>
 
-                {/* Empty State */}
-                {!loading && !error && isAuthenticated && items.length === 0 && (
-                    <div className="media-state-message">
-                        <div className="state-icon">📭</div>
-                        <h2>No items found</h2>
-                        <p className="state-hint">
-                            {activeTab === 0
-                                ? 'No items in continue watching'
-                                : activeTab === 1
-                                ? 'No movies in your Jellyfin library'
-                                : 'No shows in your Jellyfin library'}
-                        </p>
-                    </div>
-                )}
+                <main className="media-main">
+                    {error && (
+                        <div className="error-message">
+                            <p>Error: {error}</p>
+                        </div>
+                    )}
 
-                {/* Continue Watching Grid (tab 0) */}
-                {!loading && !error && isAuthenticated && activeTab === 0 && items.length > 0 && (
-                    <div className="media-section-wrap">
-                        {continueWatchingItems.length > 0 && (
-                            <div className="media-section">
-                                <h2 className="section-title">Continue Watching</h2>
-                                <div className="media-grid">
-                                    {continueWatchingItems.map((item, index) => (
-                                        <MediaCard
-                                            key={item.id}
-                                            item={item}
-                                            isFocused={index === gridIndex}
-                                            onSelect={() => openItem(item)}
-                                        />
-                                    ))}
+                    {loading && items.length === 0 && !error ? (
+                        <div className="loading">Loading...</div>
+                    ) : (
+                        <>
+                            {activeTab === 0 ? (
+                                <div className="media-section-wrap continue-watching-view" ref={contentRef}>
+                                    {continueWatchingItems.length > 0 && (
+                                        <section className={`media-section ${continueRow === 'continue' ? 'focused' : ''}`}>
+                                            <div className="section-header">
+                                                <h2 className="section-title">
+                                                    <span className="section-title-icon" aria-hidden="true">
+                                                        <PlayIcon />
+                                                    </span>
+                                                    Continue Watching
+                                                </h2>
+                                                <span className="section-meta">{continueWatchingItems.length} items</span>
+                                            </div>
+                                            <div className="media-grid">
+                                                {continueWatchingItems.map((item, index) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className={`media-item-wrapper continue-card ${
+                                                            continueRow === 'continue' && continueIndex === index ? 'focused' : ''
+                                                        }`}
+                                                    >
+                                                        <MediaCard
+                                                            item={item}
+                                                            onSelect={() => {
+                                                                focusContinueWatching('continue', index)
+                                                                openItem(item)
+                                                            }}
+                                                            showProgress={true}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {nextUpItems.length > 0 && (
+                                        <section className={`media-section ${continueRow === 'next' ? 'focused' : ''}`}>
+                                            <div className="section-header">
+                                                <h2 className="section-title">
+                                                    <span className="section-title-icon" aria-hidden="true">
+                                                        <ShowsIcon />
+                                                    </span>
+                                                    Next Up
+                                                </h2>
+                                                <span className="section-meta">{nextUpItems.length} items</span>
+                                            </div>
+                                            <div className="media-grid">
+                                                {nextUpItems.map((item, index) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className={`media-item-wrapper ${
+                                                            continueRow === 'next' && continueIndex === index ? 'focused' : ''
+                                                        }`}
+                                                    >
+                                                        <MediaCard
+                                                            item={item}
+                                                            onSelect={() => {
+                                                                focusContinueWatching('next', index)
+                                                                openItem(item)
+                                                            }}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {continueWatchingItems.length === 0 && nextUpItems.length === 0 && (
+                                        <div className="empty-state">
+                                            <p>No media found in your library.</p>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        )}
-                        {nextUpItems.length > 0 && (
-                            <div className="media-section">
-                                <h2 className="section-title">Next Up</h2>
-                                <div className="media-grid">
-                                    {nextUpItems.map((item, index) => {
-                                        const globalIndex = continueWatchingItems.length + index
-                                        return (
-                                            <MediaCard
-                                                key={item.id}
-                                                item={item}
-                                                isFocused={globalIndex === gridIndex}
-                                                onSelect={() => openItem(item)}
-                                            />
-                                        )
-                                    })}
+                            ) : (
+                                <div className="media-section-wrap" ref={contentRef}>
+                                    <section className="media-section focused">
+                                        <div className="media-grid">
+                                            {items.map((item, index) => (
+                                                <div
+                                                    key={item.id}
+                                                    className={`media-item-wrapper ${index === gridIndex ? 'focused' : ''}`}
+                                                >
+                                                    <MediaCard
+                                                        item={item}
+                                                        isFocused={index === gridIndex}
+                                                        onSelect={() => {
+                                                            setGridIndex(index)
+                                                            openItem(item)
+                                                        }}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </section>
                                 </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Media Grid (for Movies and Shows tabs) */}
-                {!loading && !error && isAuthenticated && activeTab !== 0 && items.length > 0 && (
-                    <div className="media-grid">
-                        {items.map((item, index) => (
-                            <MediaCard
-                                key={item.id}
-                                item={item}
-                                isFocused={index === gridIndex}
-                                onSelect={() => openItem(item)}
-                            />
-                        ))}
-                    </div>
-                )}
+                            )}
+                        </>
+                    )}
+                </main>
             </div>
 
-            {/* Detail Overlay */}
             {showDetail && selectedItem && (
                 <div className="detail-overlay" onClick={() => { setShowDetail(false); setSelectedItem(null) }}>
                     <div className="detail-card" onClick={(e) => e.stopPropagation()}>
-                        {/* Poster */}
                         <div className="detail-poster">
                             {selectedItem.posterUrl ? (
                                 <img src={selectedItem.posterUrl} alt={selectedItem.title} />
@@ -517,9 +1224,13 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     <span>{selectedItem.title.charAt(0).toUpperCase()}</span>
                                 </div>
                             )}
+                            {selectedItem.type === 'episode' && selectedItem.watched && (
+                                <div className="detail-poster-badge" aria-label="Episode already seen">
+                                    <SeenIcon />
+                                </div>
+                            )}
                         </div>
 
-                        {/* Info */}
                         <div className="detail-info">
                             <h2 className="detail-title">
                                 {selectedItem.title}
@@ -546,7 +1257,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                 <p className="detail-overview">{selectedItem.overview}</p>
                             )}
 
-                            {/* Progress */}
                             {selectedItem.duration && selectedItem.resumePosition && selectedItem.resumePosition > 0 && (
                                 <div className="detail-progress-section">
                                     <div className="detail-progress-label">
@@ -561,45 +1271,56 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                 </div>
                             )}
 
-                            {/* Player Buttons */}
                             <div className="detail-actions">
-                                <button className="play-button focused" onClick={handlePlay}>
-                                    <span className="play-icon">▶</span>
+                                <button
+                                    className={`play-button ${detailFocus === 'play' ? 'focused' : ''}`}
+                                    onClick={() => { void handlePlay() }}
+                                >
+                                    <span className="play-icon">
+                                        <PlayIcon />
+                                    </span>
                                     Play
                                 </button>
+                                <div className="detail-action-row" role="toolbar" aria-label="Media actions">
+                                    {detailActions.map((action, index) => {
+                                        const ActionIcon = action.icon
+                                        return (
+                                            <button
+                                                key={action.key}
+                                                className={`icon-action-button ${
+                                                    detailFocus === 'actions' && detailActionIndex === index ? 'focused' : ''
+                                                } ${action.disabled ? 'disabled' : ''}`}
+                                                onClick={() => {
+                                                    if (!action.disabled) {
+                                                        action.onSelect()
+                                                    }
+                                                }}
+                                                disabled={action.disabled}
+                                                aria-label={action.label}
+                                                title={action.label}
+                                            >
+                                                <ActionIcon />
+                                                <span className="sr-only">{action.label}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
 
-                            {!selectedItem.filePath && (
-                                <p className="detail-warning">
-                                    ⚠ No local file path found for this item
-                                </p>
-                            )}
-
-                            <p className="detail-nav-hint">
-                                Enter play • Back close
-                            </p>
+                            <p className="detail-nav-hint">Up/Down switch rows • Left/Right move actions • Back close</p>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Show Detail Modal */}
-            {showShowDetail && selectedItem && (
+            {showShowDetail && showDetailTarget && (
                 <ShowDetailModal
-                    show={{
-                        id: selectedItem.id,
-                        title: selectedItem.title,
-                        posterUrl: selectedItem.posterUrl,
-                        overview: selectedItem.overview,
-                        year: selectedItem.year,
-                    }}
+                    show={showDetailTarget}
                     onClose={() => {
-                        setShowShowDetail(false)
-                        setSelectedItem(null)
+                        closeDetailViews()
                     }}
                     onPlay={(episode) => {
-                        setShowShowDetail(false)
-                        setSelectedItem(null)
+                        closeDetailViews()
                         void launchVlc({
                             ...episode,
                             type: 'episode',
@@ -607,11 +1328,6 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     }}
                 />
             )}
-
-            {/* Footer */}
-            <div className="media-app-footer">
-                <p>↑↓←→ Navigate • Enter Select • Back Return home</p>
-            </div>
         </div>
     )
 }

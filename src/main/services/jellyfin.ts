@@ -11,6 +11,7 @@ interface JellyfinItem {
     ProductionYear?: number
     Overview?: string
     RunTimeTicks?: number
+    CommunityRating?: number
     ImageTags?: { Primary?: string }
     BackdropImageTags?: string[]
     UserData?: {
@@ -36,17 +37,19 @@ interface JellyfinItem {
 interface MappedItem {
     id: string
     title: string
-    type: 'movie' | 'series' | 'episode'
+    type: 'movie' | 'series' | 'season' | 'episode'
     year?: number
     posterUrl?: string
     backdropUrl?: string
     overview?: string
     duration?: number
+    communityRating?: number
     watched: boolean
     resumePosition?: number
     playedPercentage?: number
     filePath?: string
     seriesName?: string
+    seriesId?: string
     seasonName?: string
     seasonNumber?: number
     episodeNumber?: number
@@ -96,11 +99,53 @@ function resolveItemPath(itemPath: string | undefined, itemType: MappedItem['typ
         return mapToLibraryBase(itemPath, config.moviesBasePath, ['movies'])
     }
 
-    if ((itemType === 'series' || itemType === 'episode') && config.showsBasePath) {
+    if ((itemType === 'series' || itemType === 'season' || itemType === 'episode') && config.showsBasePath) {
         return mapToLibraryBase(itemPath, config.showsBasePath, ['shows', 'tv', 'series'])
     }
 
     return itemPath
+}
+
+const LOCAL_METADATA_ROOT = '/var/lib/jellyfin/metadata'
+const LOCAL_IMAGE_NAMES = ['poster.jpg', 'thumb.jpg', 'landscape.jpg', 'folder.jpg', 'primary.jpg']
+
+function uniquePaths(paths: Array<string | undefined>): string[] {
+    return [...new Set(paths.filter((value): value is string => !!value))]
+}
+
+function getLocalMetadataRoots(): string[] {
+    const config = getConfig()
+    return uniquePaths([
+        config.mediaBasePath ? path.join(config.mediaBasePath, 'metadata') : undefined,
+        config.moviesBasePath ? path.join(config.moviesBasePath, 'metadata') : undefined,
+        config.showsBasePath ? path.join(config.showsBasePath, 'metadata') : undefined,
+        LOCAL_METADATA_ROOT,
+    ])
+}
+
+function findLocalImagePath(itemId: string): string | undefined {
+    for (const root of getLocalMetadataRoots()) {
+        const candidateDirs = [
+            path.join(root, itemId),
+            path.join(root, 'metadata', itemId),
+            path.join(root, itemId, 'metadata'),
+        ]
+
+        for (const candidateDir of candidateDirs) {
+            for (const filename of LOCAL_IMAGE_NAMES) {
+                const candidate = path.join(candidateDir, filename)
+                if (fs.existsSync(candidate)) {
+                    return candidate
+                }
+            }
+        }
+    }
+
+    return undefined
+}
+
+function toLocalImageUrl(filePath: string): string {
+    return `local://${encodeURI(filePath)}`
 }
 
 // Jellyfin auth header
@@ -168,16 +213,26 @@ function mapItem(item: JellyfinItem): MappedItem {
     const config = getConfig()
     const token = accessToken || config.jellyfinApiKey
     const jellyfinPath = item.Path || (item.MediaSources && item.MediaSources[0]?.Path)
-    const itemType = item.Type === 'Movie' ? 'movie' : item.Type === 'Series' ? 'series' : 'episode'
+    const itemType =
+        item.Type === 'Movie'
+            ? 'movie'
+            : item.Type === 'Series'
+                ? 'series'
+                : item.Type === 'Season'
+                    ? 'season'
+                    : 'episode'
     const filePath = resolveItemPath(jellyfinPath, itemType)
 
     // Always use Jellyfin for poster images
-    let posterUrl = item.ImageTags?.Primary
+    const localPosterPath = findLocalImagePath(item.Id)
+    let posterUrl = localPosterPath
+        ? toLocalImageUrl(localPosterPath)
+        : item.ImageTags?.Primary
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
 
-    // For episodes, prefer series poster so cards match Movies/Shows visual style.
-    if (itemType === 'episode') {
+    // For seasons, prefer the series poster. Episodes should keep their own artwork.
+    if (itemType === 'season') {
         if (item.SeriesId && item.SeriesPrimaryImageTag) {
             posterUrl = `${config.jellyfinUrl}/Items/${item.SeriesId}/Images/Primary?tag=${item.SeriesPrimaryImageTag}${token ? `&api_key=${token}` : ''}`
         } else if (item.ParentThumbItemId && item.ParentThumbImageTag) {
@@ -185,9 +240,17 @@ function mapItem(item: JellyfinItem): MappedItem {
         }
     }
 
+    const seasonNumber =
+        itemType === 'season'
+            ? item.IndexNumber ?? item.ParentIndexNumber
+            : item.ParentIndexNumber
+
     return {
         id: item.Id,
-        title: item.Name,
+        title:
+            itemType === 'season'
+                ? item.Name || (seasonNumber !== undefined ? `Season ${seasonNumber}` : 'Season')
+                : item.Name,
         type: itemType,
         year: item.ProductionYear,
         posterUrl,
@@ -196,6 +259,7 @@ function mapItem(item: JellyfinItem): MappedItem {
             : undefined,
         overview: item.Overview,
         duration: item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 10000000) : undefined,
+        communityRating: item.CommunityRating,
         watched: item.UserData?.Played || false,
         resumePosition: item.UserData?.PlaybackPositionTicks
             ? Math.floor(item.UserData.PlaybackPositionTicks / 10000000)
@@ -203,8 +267,9 @@ function mapItem(item: JellyfinItem): MappedItem {
         playedPercentage: item.UserData?.PlayedPercentage || 0,
         filePath,
         seriesName: item.SeriesName,
+        seriesId: item.SeriesId,
         seasonName: item.SeasonName,
-        seasonNumber: item.ParentIndexNumber,
+        seasonNumber,
         episodeNumber: item.IndexNumber,
     }
 }
@@ -301,8 +366,8 @@ export async function getSeasons(seriesId: string): Promise<MappedItem[]> {
         const api = getClient()
         const response = await api.get(`/Shows/${seriesId}/Seasons`, {
             params: {
-                UserId: userId,
-                Fields: 'Overview,UserData',
+                userId,
+                Fields: 'Overview,Path,MediaSources,UserData,ImageTags,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,IndexNumber,ParentIndexNumber,ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount',
             },
             headers: getHeaders(),
         })
@@ -324,9 +389,9 @@ export async function getEpisodes(
         const api = getClient()
         const response = await api.get(`/Shows/${seriesId}/Episodes`, {
             params: {
-                UserId: userId,
-                SeasonId: seasonId,
-                Fields: 'Overview,Path,MediaSources,UserData',
+                seasonId,
+                userId,
+                Fields: 'Path,MediaSources,ItemCounts,PrimaryImageAspectRatio,CanDelete,MediaSourceCount,Overview,ImageTags,RunTimeTicks,UserData,IndexNumber,ParentIndexNumber,SeriesName,SeasonName,SeriesId,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag',
             },
             headers: getHeaders(),
         })
@@ -335,6 +400,26 @@ export async function getEpisodes(
         handleAuthError(err)
         console.error('Failed to fetch episodes:', err)
         return []
+    }
+}
+
+export async function getItemDetails(itemId: string): Promise<MappedItem | null> {
+    if (!ensureAuth()) return null
+
+    try {
+        const api = getClient()
+        const response = await api.get(`/Items/${itemId}`, {
+            params: {
+                userId,
+                Fields: 'Overview,Path,MediaSources,UserData,IndexNumber,ParentIndexNumber,SeriesId,SeriesName,SeasonName,ProductionYear,ImageTags,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,BackdropImageTags',
+            },
+            headers: getHeaders(),
+        })
+        return mapItem(response.data)
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to fetch item details:', err)
+        return null
     }
 }
 

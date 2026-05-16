@@ -46,9 +46,11 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
     const containerRef = useRef<HTMLDivElement>(null)
     const hasRequestedRef = useRef(false)
     const slotAcquiredRef = useRef(false)
+    const cancelledRef = useRef(false)
 
     // Reset state when src changes
     useEffect(() => {
+        cancelledRef.current = false
         hasRequestedRef.current = false
         setLoadSrc(null)
         setLoaded(false)
@@ -68,6 +70,10 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
 
                     // Wait for a concurrency slot, then set the src
                     requestSlot().then(() => {
+                        if (cancelledRef.current) {
+                            releaseSlot()
+                            return
+                        }
                         slotAcquiredRef.current = true
                         setLoadSrc(src)
                     })
@@ -78,6 +84,7 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
 
         observer.observe(el)
         return () => {
+            cancelledRef.current = true
             observer.disconnect()
             // If slot acquired but component unmounting before image loaded, release it
             if (slotAcquiredRef.current && !loaded && !failed) {
@@ -129,4 +136,4 @@ const LazyImage: React.FC<LazyImageProps> = ({ src, alt, onError, className }) =
     )
 }
 
-export default LazyImage
+export default React.memo(LazyImage)
