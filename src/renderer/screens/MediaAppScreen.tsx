@@ -521,11 +521,28 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }, [selectedItem?.id, selectedItem?.seriesId, selectedItem?.type, showDetail])
 
     useEffect(() => {
-        if (focusedArea !== 'content' || !contentRef.current) {
+        const content = contentRef.current
+        if (focusedArea !== 'content' || !content) {
             return
         }
 
-        const focused = contentRef.current.querySelector('.media-item-wrapper.focused')
+        if (activeTab === 0) {
+            const focusedSection = content.querySelector<HTMLElement>('.media-section.focused')
+            if (focusedSection) {
+                const padding = 18
+                const sectionRect = focusedSection.getBoundingClientRect()
+                const contentRect = content.getBoundingClientRect()
+
+                if (sectionRect.top < contentRect.top + padding) {
+                    content.scrollBy({ top: sectionRect.top - contentRect.top - padding, behavior: 'auto' })
+                } else if (sectionRect.bottom > contentRect.bottom - padding) {
+                    content.scrollBy({ top: sectionRect.bottom - contentRect.bottom + padding, behavior: 'auto' })
+                }
+            }
+            return
+        }
+
+        const focused = content.querySelector('.media-item-wrapper.focused')
         if (focused) {
             focused.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
         }
