@@ -1092,7 +1092,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     return (
         <div className="media-app-screen">
             <div className="media-app-shell">
-                <aside className="media-sidebar" aria-label="Media navigation">
+                <aside
+                    className={`media-sidebar ${focusedArea === 'sidebar' ? 'expanded' : ''}`}
+                    aria-label="Media navigation"
+                >
                     <button
                         className={`sidebar-button sidebar-home ${
                             focusedArea === 'sidebar' && sidebarIndex === 0 ? 'focused' : ''
@@ -1101,7 +1104,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         aria-label="Home"
                     >
                         <HomeIcon />
-                        <span className="sr-only">Home</span>
+                        <span className="sidebar-label">Home</span>
                     </button>
 
                     <div className="sidebar-divider" />
@@ -1125,7 +1128,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     aria-label={item.label}
                                 >
                                     <item.icon />
-                                    <span className="sr-only">{item.label}</span>
+                                    <span className="sidebar-label">{item.label}</span>
                                 </button>
                             )
                         })}
