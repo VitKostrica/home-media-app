@@ -1056,7 +1056,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
     const sidebarItems = [
         { label: 'Home', icon: HomeIcon },
-        { label: 'Continue Watching', icon: ContinueIcon },
+        { label: 'Continue', icon: ContinueIcon },
         { label: 'Movies', icon: MoviesIcon },
         { label: 'Shows', icon: ShowsIcon },
     ]
