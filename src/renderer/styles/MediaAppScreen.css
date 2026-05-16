@@ -196,13 +196,29 @@
     height: 100%;
     gap: 14px;
     overflow-y: auto;
-    padding-right: 8px;
+    padding-right: 12px;
     padding-bottom: 24px;
     scroll-padding-block: 18px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.34) rgba(255, 255, 255, 0.08);
 }
 
 .continue-watching-view::-webkit-scrollbar {
-    display: none;
+    width: 8px;
+}
+
+.continue-watching-view::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.continue-watching-view::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.34);
+    border-radius: 8px;
+}
+
+.continue-watching-view::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .media-section {

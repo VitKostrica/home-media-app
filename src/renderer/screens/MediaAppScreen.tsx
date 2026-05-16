@@ -525,7 +525,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             return
         }
 
-        const focused = contentRef.current.querySelector('.media-card.focused')
+        const focused = contentRef.current.querySelector('.media-item-wrapper.focused')
         if (focused) {
             focused.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
         }
