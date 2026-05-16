@@ -142,10 +142,12 @@
 .episode-panel {
     min-height: 0;
     overflow-y: auto;
-    padding-right: 8px;
+    overflow-x: hidden;
+    padding: 4px 12px 12px 6px;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    scroll-padding-block: 12px;
 }
 
 .panel-header {
@@ -186,6 +188,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    padding: 4px 6px 10px;
 }
 
 .season-card {
@@ -206,7 +209,8 @@
     box-shadow:
         0 0 0 2px rgba(100, 181, 246, 0.18),
         0 0 22px rgba(66, 165, 245, 0.32);
-    transform: translateX(4px);
+    transform: translateX(3px);
+    transform-origin: left center;
 }
 
 .season-poster {
@@ -274,7 +278,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-bottom: 8px;
+    padding: 4px 8px 12px;
 }
 
 .episode-card {
@@ -295,6 +299,7 @@
         0 0 0 2px rgba(100, 181, 246, 0.18),
         0 0 22px rgba(66, 165, 245, 0.32);
     transform: scale(1.008);
+    transform-origin: left center;
 }
 
 .episode-poster {
