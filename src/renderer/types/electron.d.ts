@@ -23,6 +23,7 @@ declare global {
                 getItemDetails: (itemId: string) => Promise<any>
                 getResumeItems: () => Promise<any>
                 getNextUpItems: () => Promise<any>
+                getLatestItems: () => Promise<any>
                 getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
                 reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
                 reportProgress: (itemId: string, positionTicks: number, isPaused?: boolean) => Promise<void>

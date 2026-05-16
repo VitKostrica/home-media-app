@@ -495,6 +495,31 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
     }
 }
 
+/** Get latest media items across Jellyfin libraries */
+export async function getLatestItems(): Promise<MappedItem[]> {
+    if (!ensureAuth()) return []
+
+    try {
+        const api = getClient()
+        const response = await api.get(`/Users/${userId}/Items/Latest`, {
+            params: {
+                Limit: 24,
+                Fields: 'PrimaryImageAspectRatio,Path,MediaSources,UserData,RunTimeTicks,Overview,ImageTags,SeriesId,SeriesName,SeasonName,IndexNumber,ParentIndexNumber,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,BackdropImageTags',
+                ImageTypeLimit: 1,
+                EnableImageTypes: 'Primary,Backdrop,Thumb',
+            },
+            headers: getHeaders(),
+        })
+
+        const items = Array.isArray(response.data) ? response.data : response.data?.Items || []
+        return items.map(mapItem)
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to fetch latest items:', err)
+        return []
+    }
+}
+
 /** Get playback info for an item (gets the stream URL) */
 export async function getPlaybackInfo(
     itemId: string

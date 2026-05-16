@@ -225,6 +225,10 @@ ipcMain.handle('jellyfin:get-next-up-items', async () => {
     return await jellyfinService.getNextUpItems()
 })
 
+ipcMain.handle('jellyfin:get-latest-items', async () => {
+    return await jellyfinService.getLatestItems()
+})
+
 ipcMain.handle('jellyfin:get-playback-info', async (_, itemId: string) => {
     console.log('[IPC] jellyfin:get-playback-info called with itemId:', itemId)
     const result = await jellyfinService.getPlaybackInfo(itemId)

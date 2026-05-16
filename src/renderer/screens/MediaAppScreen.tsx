@@ -41,12 +41,13 @@ interface MediaAppScreenProps {
 type ActiveTab = 0 | 1 | 2
 type SidebarIndex = 0 | 1 | 2 | 3
 type FocusArea = 'sidebar' | 'content'
-type ContinueRow = 'continue' | 'next'
+type ContinueRow = 'continue' | 'next' | 'latest'
 type DetailFocus = 'play' | 'actions'
 
 const COLUMNS = 6
-const CONTINUE_WATCHING_ROW_LIMIT = 6
-const NEXT_UP_ROW_LIMIT = 6
+const CONTINUE_WATCHING_ROW_LIMIT = 7
+const NEXT_UP_ROW_LIMIT = 7
+const LATEST_ROW_LIMIT = 7
 const NEXT_UP_RETRY_DELAY_MS = 400
 
 function sleep(ms: number): Promise<void> {
@@ -167,6 +168,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [error, setError] = useState<string | null>(null)
     const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
     const [nextUpItems, setNextUpItems] = useState<MediaItem[]>([])
+    const [latestItems, setLatestItems] = useState<MediaItem[]>([])
     const [sidebarIndex, setSidebarIndex] = useState<SidebarIndex>(1)
     const [focusedArea, setFocusedArea] = useState<FocusArea>('content')
     const [continueRow, setContinueRow] = useState<ContinueRow>('continue')
@@ -236,6 +238,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     if (requestId !== fetchRequestIdRef.current) {
                         return
                     }
+                    const latestItems = await api.getLatestItems()
+                    if (requestId !== fetchRequestIdRef.current) {
+                        return
+                    }
 
                     if (options?.retryNextUp && nextUpItems.length === 0) {
                         await sleep(NEXT_UP_RETRY_DELAY_MS)
@@ -255,8 +261,12 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     const nextUpUnique = (nextUpItems || []).filter(
                         (item) => item?.id && !seenIds.has(item.id)
                     )
+                    nextUpUnique.forEach((item) => seenIds.add(item.id))
+                    const latestUnique = (latestItems || []).filter(
+                        (item) => item?.id && !seenIds.has(item.id)
+                    )
 
-                    const episodeItems = [...resumeUnique, ...nextUpUnique].filter(
+                    const episodeItems = [...resumeUnique, ...nextUpUnique, ...latestUnique].filter(
                         (item) => item.type === 'episode' && !!(item as { seriesId?: string }).seriesId
                     ) as MediaItem[]
                     const uniqueSeriesIds = [
@@ -289,18 +299,22 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
                     const continueRowItems = attachSeriesPoster(resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT))
                     const nextUpRowItems = attachSeriesPoster(nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT))
+                    const latestRowItems = attachSeriesPoster(latestUnique.slice(0, LATEST_ROW_LIMIT))
 
                     setContinueWatchingItems(continueRowItems)
                     setNextUpItems(nextUpRowItems)
-                    data = [...continueRowItems, ...nextUpRowItems]
+                    setLatestItems(latestRowItems)
+                    data = [...continueRowItems, ...nextUpRowItems, ...latestRowItems]
                 } else if (tabIndex === 1) {
                     data = await api.getMovies()
                     setContinueWatchingItems([])
                     setNextUpItems([])
+                    setLatestItems([])
                 } else {
                     data = await api.getSeries()
                     setContinueWatchingItems([])
                     setNextUpItems([])
+                    setLatestItems([])
                 }
 
                 if (requestId !== fetchRequestIdRef.current) {
@@ -410,11 +424,16 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 setContinueIndex((prev) => Math.min(prev, Math.max(continueWatchingItems.length - 1, 0)))
             } else if (continueRow === 'next' && nextUpItems.length > 0) {
                 setContinueIndex((prev) => Math.min(prev, Math.max(nextUpItems.length - 1, 0)))
+            } else if (continueRow === 'latest' && latestItems.length > 0) {
+                setContinueIndex((prev) => Math.min(prev, Math.max(latestItems.length - 1, 0)))
             } else if (continueWatchingItems.length > 0) {
                 setContinueRow('continue')
                 setContinueIndex(0)
             } else if (nextUpItems.length > 0) {
                 setContinueRow('next')
+                setContinueIndex(0)
+            } else if (latestItems.length > 0) {
+                setContinueRow('latest')
                 setContinueIndex(0)
             }
             return
@@ -430,6 +449,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         error,
         isAuthenticated,
         items.length,
+        latestItems.length,
         loading,
         nextUpItems.length,
     ])
@@ -501,7 +521,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }, [selectedItem?.id, selectedItem?.seriesId, selectedItem?.type, showDetail])
 
     useEffect(() => {
-        if (focusedArea !== 'content' || activeTab === 0 || !contentRef.current) {
+        if (focusedArea !== 'content' || !contentRef.current) {
             return
         }
 
@@ -509,7 +529,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         if (focused) {
             focused.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
         }
-    }, [activeTab, focusedArea, gridIndex])
+    }, [activeTab, continueIndex, continueRow, focusedArea, gridIndex])
 
     const checkAuth = async () => {
         try {
@@ -919,7 +939,12 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             }
 
             if (activeTab === 0) {
-                const currentList = continueRow === 'continue' ? continueWatchingItems : nextUpItems
+                const currentList =
+                    continueRow === 'continue'
+                        ? continueWatchingItems
+                        : continueRow === 'next'
+                            ? nextUpItems
+                            : latestItems
                 const currentMax = Math.max(currentList.length - 1, 0)
                 const safeIndex = Math.min(continueIndex, currentMax)
 
@@ -936,13 +961,19 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     if (continueRow === 'continue' && nextUpItems.length > 0) {
                         setContinueRow('next')
                         setContinueIndex(0)
+                    } else if (continueRow !== 'latest' && latestItems.length > 0) {
+                        setContinueRow('latest')
+                        setContinueIndex(0)
                     }
                     return
                 }
 
                 if (matches(event.key, 'up')) {
                     event.preventDefault()
-                    if (continueRow === 'next' && continueWatchingItems.length > 0) {
+                    if (continueRow === 'latest' && nextUpItems.length > 0) {
+                        setContinueRow('next')
+                        setContinueIndex(0)
+                    } else if (continueRow !== 'continue' && continueWatchingItems.length > 0) {
                         setContinueRow('continue')
                         setContinueIndex(0)
                     }
@@ -953,7 +984,11 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     event.preventDefault()
                     const item = currentList[safeIndex]
                     if (item) {
-                        void launchVlc(item)
+                        if (item.type === 'series') {
+                            openItem(item)
+                        } else {
+                            void launchVlc(item)
+                        }
                     }
                     return
                 }
@@ -1005,6 +1040,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             handlePlay,
             isAuthenticated,
             items,
+            latestItems,
             launchVlc,
             matches,
             nextUpItems,
@@ -1179,7 +1215,40 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                         </section>
                                     )}
 
-                                    {continueWatchingItems.length === 0 && nextUpItems.length === 0 && (
+                                    {latestItems.length > 0 && (
+                                        <section className={`media-section ${continueRow === 'latest' ? 'focused' : ''}`}>
+                                            <div className="section-header">
+                                                <h2 className="section-title">
+                                                    <span className="section-title-icon" aria-hidden="true">
+                                                        <MoviesIcon />
+                                                    </span>
+                                                    Latest
+                                                </h2>
+                                                <span className="section-meta">{latestItems.length} items</span>
+                                            </div>
+                                            <div className="media-grid">
+                                                {latestItems.map((item, index) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className={`media-item-wrapper ${
+                                                            continueRow === 'latest' && continueIndex === index ? 'focused' : ''
+                                                        }`}
+                                                    >
+                                                        <MediaCard
+                                                            item={item}
+                                                            onSelect={() => {
+                                                                focusContinueWatching('latest', index)
+                                                                openItem(item)
+                                                            }}
+                                                            showProgress={true}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {continueWatchingItems.length === 0 && nextUpItems.length === 0 && latestItems.length === 0 && (
                                         <div className="empty-state">
                                             <p>No media found in your library.</p>
                                         </div>
