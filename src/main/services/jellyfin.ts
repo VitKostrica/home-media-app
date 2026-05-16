@@ -231,15 +231,6 @@ function mapItem(item: JellyfinItem): MappedItem {
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
 
-    // For seasons, prefer the series poster. Episodes should keep their own artwork.
-    if (itemType === 'season') {
-        if (item.SeriesId && item.SeriesPrimaryImageTag) {
-            posterUrl = `${config.jellyfinUrl}/Items/${item.SeriesId}/Images/Primary?tag=${item.SeriesPrimaryImageTag}${token ? `&api_key=${token}` : ''}`
-        } else if (item.ParentThumbItemId && item.ParentThumbImageTag) {
-            posterUrl = `${config.jellyfinUrl}/Items/${item.ParentThumbItemId}/Images/Primary?tag=${item.ParentThumbImageTag}${token ? `&api_key=${token}` : ''}`
-        }
-    }
-
     const seasonNumber =
         itemType === 'season'
             ? item.IndexNumber ?? item.ParentIndexNumber
@@ -734,5 +725,51 @@ export async function reportStopped(
         console.error(
             `[JellyfinPlayback] Stopped failed status=${e?.response?.status || 'unknown'} message=${e?.message || err}`
         )
+    }
+}
+
+export async function markItemPlayed(itemId: string): Promise<void> {
+    if (!ensureAuth()) return
+
+    try {
+        const api = getClient()
+        const normalizedItemId = idToGuid(itemId)
+        await api.post(
+            `/Users/${userId}/PlayedItems/${itemId}?DatePlayed=${encodeURIComponent(new Date().toISOString())}`,
+            null,
+            { headers: getHeaders() }
+        )
+        await api.post(
+            `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+            {
+                PlaybackPositionTicks: 0,
+            },
+            { headers: getHeaders() }
+        )
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to mark item played:', err)
+    }
+}
+
+export async function markItemUnplayed(itemId: string): Promise<void> {
+    if (!ensureAuth()) return
+
+    try {
+        const api = getClient()
+        const normalizedItemId = idToGuid(itemId)
+        await api.delete(`/Users/${userId}/PlayedItems/${itemId}`, {
+            headers: getHeaders(),
+        })
+        await api.post(
+            `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+            {
+                PlaybackPositionTicks: 0,
+            },
+            { headers: getHeaders() }
+        )
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to mark item unplayed:', err)
     }
 }

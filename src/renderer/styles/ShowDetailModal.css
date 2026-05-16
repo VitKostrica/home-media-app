@@ -13,11 +13,12 @@
 }
 
 .show-detail-card {
-    background-color: #1a1a1a;
-    border-radius: 14px;
-    padding: 24px;
-    width: min(1600px, 95vw);
-    height: min(90vh, 980px);
+    background: #101827;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 28px;
+    width: min(1720px, 96vw);
+    height: min(92vh, 1000px);
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
 }
@@ -27,37 +28,17 @@
 .show-detail-view {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 22px;
     min-height: 0;
     height: 100%;
 }
 
 .show-header {
     display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 24px;
+    align-items: start;
     flex: 0 0 auto;
-}
-
-.show-detail-poster {
-    flex-shrink: 0;
-    width: 200px;
-    height: 300px;
-    border-radius: 10px;
-    overflow: hidden;
-    background: linear-gradient(135deg, #333 0%, #222 100%);
-}
-
-.show-detail-poster-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 80px;
-    font-weight: bold;
-    color: #666;
-    background: linear-gradient(135deg, #333 0%, #222 100%);
 }
 
 .show-detail-info {
@@ -65,36 +46,94 @@
 }
 
 .show-detail-title {
-    font-size: 28px;
+    font-size: 2.35rem;
     font-weight: bold;
     color: #fff;
-    margin: 0 0 10px 0;
+    margin: 0 0 12px 0;
 }
 
 .show-detail-year {
-    font-size: 24px;
+    font-size: 1.8rem;
     color: #999;
     font-weight: normal;
 }
 
 .show-detail-overview {
     color: #ccc;
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 1.1rem;
+    line-height: 1.55;
     margin: 0;
-    max-width: 1100px;
+    max-width: 1180px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .show-detail-nav-hint {
     color: #999;
-    font-size: 12px;
-    margin: 16px 0 0 0;
+    font-size: 0.95rem;
+    margin: 14px 0 0 0;
+}
+
+.show-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.show-action-button,
+.season-action-button {
+    min-height: 58px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f3f9ff;
+    font-size: 1rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.show-action-button svg,
+.season-action-button svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.show-action-button.focused,
+.season-action-button.focused {
+    background: rgba(33, 150, 243, 0.22);
+    border-color: #64b5f6;
+    box-shadow:
+        0 0 0 2px rgba(100, 181, 246, 0.18),
+        0 0 24px rgba(66, 165, 245, 0.32);
+    transform: scale(1.03);
+}
+
+.show-action-button:disabled,
+.season-action-button:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .show-content-split {
     display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
-    gap: 20px;
+    grid-template-columns: 360px minmax(0, 1fr);
+    gap: 24px;
     min-height: 0;
     flex: 1;
 }
@@ -106,7 +145,7 @@
     padding-right: 8px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 .panel-header {
@@ -117,26 +156,27 @@
 }
 
 .panel-title {
-    font-size: 20px;
+    font-size: 1.45rem;
     font-weight: 700;
     color: #fff;
     margin: 0;
 }
 
 .panel-subtitle {
-    font-size: 13px;
+    font-size: 1rem;
     color: #a6a6a6;
     margin: 4px 0 0 0;
 }
 
 .panel-meta {
     color: #8e8e8e;
-    font-size: 12px;
+    font-size: 0.95rem;
     white-space: nowrap;
 }
 
 .panel-empty {
     color: #a5a5a5;
+    font-size: 1.05rem;
     margin: 0;
 }
 
@@ -150,25 +190,27 @@
 
 .season-card {
     display: flex;
-    gap: 12px;
+    gap: 14px;
     align-items: center;
-    background-color: #232323;
+    background-color: rgba(255, 255, 255, 0.055);
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #3a3a3a;
+    border: 2px solid rgba(255, 255, 255, 0.1);
     transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
-    padding: 10px;
+    padding: 12px;
 }
 
 .season-card.focused {
-    border-color: #0066cc;
-    box-shadow: 0 0 16px rgba(0, 102, 204, 0.35);
-    transform: translateX(2px);
+    border-color: #64b5f6;
+    box-shadow:
+        0 0 0 2px rgba(100, 181, 246, 0.18),
+        0 0 22px rgba(66, 165, 245, 0.32);
+    transform: translateX(4px);
 }
 
 .season-poster {
-    width: 84px;
+    width: 96px;
     aspect-ratio: 2 / 3;
     flex-shrink: 0;
     border-radius: 8px;
@@ -200,7 +242,7 @@
 }
 
 .season-title {
-    font-size: 14px;
+    font-size: 1.08rem;
     font-weight: 700;
     color: #fff;
     margin: 0;
@@ -210,7 +252,7 @@
 }
 
 .season-description {
-    font-size: 12px;
+    font-size: 0.92rem;
     color: #a9a9a9;
     margin: 6px 0 0 0;
     line-height: 1.35;
@@ -222,28 +264,16 @@
 
 /* ── Episodes View ────────────────────────────────────── */
 
-.selected-season-summary {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 14px 16px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.selected-season-overview {
-    margin: 0;
-    color: #b9b9b9;
-    font-size: 13px;
-    line-height: 1.5;
-    max-width: 1000px;
+.season-action-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
 }
 
 .episodes-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     padding-bottom: 8px;
 }
 
@@ -251,17 +281,19 @@
     display: flex;
     align-items: stretch;
     gap: 0;
-    background-color: #232323;
-    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.055);
+    border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #3a3a3a;
+    border: 2px solid rgba(255, 255, 255, 0.1);
     transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
 }
 
 .episode-card.focused {
-    border-color: #0066cc;
-    box-shadow: 0 0 16px rgba(0, 102, 204, 0.32);
+    border-color: #64b5f6;
+    box-shadow:
+        0 0 0 2px rgba(100, 181, 246, 0.18),
+        0 0 22px rgba(66, 165, 245, 0.32);
     transform: scale(1.008);
 }
 
@@ -296,7 +328,7 @@
 .episode-info {
     flex: 1;
     min-width: 0;
-    padding: 12px 16px 10px;
+    padding: 14px 18px 12px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -304,7 +336,7 @@
 }
 
 .episode-label {
-    font-size: 1.05rem;
+    font-size: 1.18rem;
     font-weight: 600;
     color: #fff;
     margin: 0;
@@ -319,7 +351,7 @@
     gap: 10px;
     flex-wrap: wrap;
     color: rgba(255, 255, 255, 0.74);
-    font-size: 0.82rem;
+    font-size: 0.94rem;
 }
 
 .episode-rating {
@@ -338,7 +370,7 @@
 }
 
 .episode-description {
-    font-size: 0.86rem;
+    font-size: 0.98rem;
     color: #b9b9b9;
     margin: 0;
     display: -webkit-box;
@@ -347,32 +379,6 @@
     overflow: hidden;
     line-height: 1.25;
     max-width: 860px;
-}
-
-.episode-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 14px 0 6px;
-    color: rgba(255, 255, 255, 0.84);
-    flex-shrink: 0;
-}
-
-.episode-action-icon {
-    width: 22px;
-    height: 22px;
-    display: grid;
-    place-items: center;
-}
-
-.episode-action-icon svg {
-    width: 18px;
-    height: 18px;
-    stroke: currentColor;
-    fill: none;
-    stroke-width: 1.9;
-    stroke-linecap: round;
-    stroke-linejoin: round;
 }
 
 .episode-play-badge {
@@ -441,13 +447,13 @@
 
 .season-panel::-webkit-scrollbar-thumb,
 .episode-panel::-webkit-scrollbar-thumb {
-    background: #e50914;
+    background: rgba(100, 181, 246, 0.5);
     border-radius: 4px;
 }
 
 .season-panel::-webkit-scrollbar-thumb:hover,
 .episode-panel::-webkit-scrollbar-thumb:hover {
-    background: #c40812;
+    background: rgba(100, 181, 246, 0.72);
 }
 
 .show-detail-card::-webkit-scrollbar {

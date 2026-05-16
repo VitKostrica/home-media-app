@@ -91,6 +91,7 @@ export interface ElectronAPI {
         reportProgress: (itemId: string, positionTicks: number) => Promise<void>
         reportStopped: (itemId: string, positionTicks: number) => Promise<void>
         markPlayed: (itemId: string) => Promise<void>
+        markUnplayed: (itemId: string) => Promise<void>
     }
     configApi: {
         get: () => Promise<AppConfig>
