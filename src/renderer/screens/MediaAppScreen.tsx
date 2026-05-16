@@ -45,8 +45,8 @@ type ContinueRow = 'continue' | 'next' | 'latest'
 type DetailFocus = 'play' | 'actions'
 
 const COLUMNS = 6
-const CONTINUE_WATCHING_ROW_LIMIT = 7
-const NEXT_UP_ROW_LIMIT = 7
+const CONTINUE_WATCHING_ROW_LIMIT = 6
+const NEXT_UP_ROW_LIMIT = 6
 const LATEST_ROW_LIMIT = 7
 const NEXT_UP_RETRY_DELAY_MS = 400
 

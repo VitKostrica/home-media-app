@@ -192,6 +192,7 @@
 }
 
 .continue-watching-view {
+    box-sizing: border-box;
     height: 100%;
     gap: 14px;
     overflow-y: auto;
@@ -213,7 +214,7 @@
 }
 
 .continue-watching-view .media-section {
-    flex: 0 1 auto;
+    flex: 0 0 calc((100% - 14px) / 2);
 }
 
 .media-section.focused .section-title {
