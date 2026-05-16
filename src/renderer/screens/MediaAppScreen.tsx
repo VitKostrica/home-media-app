@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import '../styles/MediaAppScreen.css'
 import MediaCard from '../components/MediaCard'
 import JellyfinLogin from '../components/JellyfinLogin'
@@ -838,7 +838,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     event.preventDefault()
                     if (detailFocus === 'play' && actionableIndexes.length > 0) {
                         setDetailFocus('actions')
-                        setDetailActionIndex(0)
+                        setDetailActionIndex(actionableIndexes[0])
                     }
                     return
                 }
@@ -854,19 +854,25 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 if (detailFocus === 'actions') {
                     if (matches(event.key, 'left')) {
                         event.preventDefault()
-                        setDetailActionIndex((prev) => Math.max(0, prev - 1))
+                        setDetailActionIndex((prev) => {
+                            const currentEnabledIndex = Math.max(0, actionableIndexes.indexOf(prev))
+                            return actionableIndexes[Math.max(0, currentEnabledIndex - 1)] ?? prev
+                        })
                         return
                     }
 
                     if (matches(event.key, 'right')) {
                         event.preventDefault()
-                        setDetailActionIndex((prev) => Math.min(actionableIndexes.length - 1, prev + 1))
+                        setDetailActionIndex((prev) => {
+                            const currentEnabledIndex = Math.max(0, actionableIndexes.indexOf(prev))
+                            return actionableIndexes[Math.min(actionableIndexes.length - 1, currentEnabledIndex + 1)] ?? prev
+                        })
                         return
                     }
 
                     if (matches(event.key, 'confirm')) {
                         event.preventDefault()
-                        const currentAction = detailActions[actionableIndexes[detailActionIndex]]
+                        const currentAction = detailActions[detailActionIndex]
                         if (currentAction && !currentAction.disabled) {
                             currentAction.onSelect()
                         }
@@ -1078,13 +1084,24 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         { label: 'Shows', icon: ShowsIcon },
     ]
 
-    const detailActions = getDetailActions()
+    const detailActions = useMemo(() => getDetailActions(), [getDetailActions])
 
     useEffect(() => {
-        if (detailFocus === 'actions' && detailActionIndex > Math.max(detailActions.length - 1, 0)) {
-            setDetailActionIndex(0)
+        if (detailFocus !== 'actions') {
+            return
         }
-    }, [detailActionIndex, detailActions.length, detailFocus])
+
+        const actionableIndex = detailActions.findIndex((action, index) => index >= detailActionIndex && !action.disabled)
+        if (actionableIndex >= 0) {
+            setDetailActionIndex(actionableIndex)
+            return
+        }
+
+        const fallbackIndex = detailActions.findIndex((action) => !action.disabled)
+        if (fallbackIndex >= 0) {
+            setDetailActionIndex(fallbackIndex)
+        }
+    }, [detailActionIndex, detailActions, detailFocus])
 
     if (!isAuthenticated) {
         return <JellyfinLogin onSuccess={() => setIsAuthenticated(true)} />
@@ -1370,23 +1387,32 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     {detailActions.map((action, index) => {
                                         const ActionIcon = action.icon
                                         return (
-                                            <button
+                                            <div
                                                 key={action.key}
-                                                className={`icon-action-button ${
+                                                className={`detail-action-item ${
                                                     detailFocus === 'actions' && detailActionIndex === index ? 'focused' : ''
                                                 } ${action.disabled ? 'disabled' : ''}`}
-                                                onClick={() => {
-                                                    if (!action.disabled) {
-                                                        action.onSelect()
-                                                    }
-                                                }}
-                                                disabled={action.disabled}
-                                                aria-label={action.label}
-                                                title={action.label}
                                             >
-                                                <ActionIcon />
-                                                <span className="sr-only">{action.label}</span>
-                                            </button>
+                                                <button
+                                                    className={`icon-action-button ${
+                                                        detailFocus === 'actions' && detailActionIndex === index ? 'focused' : ''
+                                                    } ${action.disabled ? 'disabled' : ''}`}
+                                                    onClick={() => {
+                                                        if (!action.disabled) {
+                                                            setDetailFocus('actions')
+                                                            setDetailActionIndex(index)
+                                                            action.onSelect()
+                                                        }
+                                                    }}
+                                                    disabled={action.disabled}
+                                                    aria-label={action.label}
+                                                    title={action.label}
+                                                >
+                                                    <ActionIcon />
+                                                    <span className="sr-only">{action.label}</span>
+                                                </button>
+                                                <span className="detail-action-label">{action.label}</span>
+                                            </div>
                                         )
                                     })}
                                 </div>

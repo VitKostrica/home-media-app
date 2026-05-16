@@ -742,13 +742,33 @@
 
 .detail-action-row {
     display: flex;
-    gap: 12px;
+    gap: 14px;
+    align-items: stretch;
+    justify-content: space-between;
+}
+
+.detail-action-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
     align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.62);
+    transition: color 180ms ease;
+}
+
+.detail-action-item.focused {
+    color: #d8ecff;
+}
+
+.detail-action-item.disabled {
+    color: rgba(255, 255, 255, 0.28);
 }
 
 .icon-action-button {
-    width: 58px;
-    height: 58px;
+    width: 100%;
+    height: 62px;
     display: grid;
     place-items: center;
     background: rgba(255, 255, 255, 0.06);
@@ -761,6 +781,15 @@
         background 180ms ease,
         border-color 180ms ease,
         box-shadow 180ms ease;
+}
+
+.detail-action-label {
+    width: 100%;
+    min-height: 2.4em;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
 }
 
 .icon-action-button svg {
