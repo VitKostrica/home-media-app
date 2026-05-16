@@ -984,11 +984,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     event.preventDefault()
                     const item = currentList[safeIndex]
                     if (item) {
-                        if (item.type === 'series') {
-                            openItem(item)
-                        } else {
-                            void launchVlc(item)
-                        }
+                        openItem(item)
                     }
                     return
                 }
