@@ -529,14 +529,6 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                 {show.title}
                                 {show.year && <span className="show-detail-year"> ({show.year})</span>}
                             </h2>
-
-                            {show.overview && (
-                                <p className="show-detail-overview">{show.overview}</p>
-                            )}
-
-                            <p className="show-detail-nav-hint">
-                                Arrows navigate • Enter select/play • Back close
-                            </p>
                         </div>
 
                         <div className="show-actions">
@@ -567,28 +559,18 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                     {seasons.map((season, index) => (
                                         <div
                                             key={season.id}
-                                            className={`season-card ${index === selectedSeasonIndex && focusPane === 'seasons' ? 'focused' : ''}`}
+                                            className={`season-card ${index === selectedSeasonIndex ? 'selected' : ''} ${
+                                                index === selectedSeasonIndex && focusPane === 'seasons' ? 'focused' : ''
+                                            }`}
                                             onClick={() => {
                                                 setSelectedSeasonIndex(index)
                                                 void handleSeasonActivate(index, true)
                                             }}
                                         >
-                                            <div className="season-poster">
-                                                {season.posterUrl ? (
-                                                    <LazyImage src={season.posterUrl} alt={season.title} />
-                                                ) : (
-                                                    <div className="season-poster-placeholder">
-                                                        {season.seasonNumber !== undefined ? `S${season.seasonNumber}` : 'S?'}
-                                                    </div>
-                                                )}
-                                            </div>
                                             <div className="season-info">
                                                 <p className="season-title">
                                                     {season.seasonNumber !== undefined ? `Season ${season.seasonNumber}` : season.title}
                                                 </p>
-                                                {season.overview && (
-                                                    <p className="season-description">{season.overview}</p>
-                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -602,36 +584,32 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                     <h3 className="panel-title">
                                         {selectedSeason?.title || 'Episodes'}
                                     </h3>
-                                    {selectedSeason?.seasonNumber !== undefined && (
-                                        <p className="panel-subtitle">
-                                            Season {selectedSeason.seasonNumber}
-                                        </p>
-                                    )}
                                 </div>
-                                <span className="panel-meta">{episodes.length} items</span>
-                            </div>
-
-                            <div className="season-action-row" role="toolbar" aria-label="Season actions">
-                                {seasonActions.map((action, index) => {
-                                    const ActionIcon = action.icon
-                                    return (
-                                        <button
-                                            key={action.key}
-                                            className={`season-action-button ${
-                                                focusPane === 'seasonActions' && seasonActionIndex === index ? 'focused' : ''
-                                            }`}
-                                            onClick={() => {
-                                                setFocusPane('seasonActions')
-                                                setSeasonActionIndex(index)
-                                                void action.onSelect()
-                                            }}
-                                            disabled={action.disabled}
-                                        >
-                                            <ActionIcon />
-                                            <span>{action.label}</span>
-                                        </button>
-                                    )
-                                })}
+                                <div className="episode-header-tools">
+                                    <span className="panel-meta">{episodes.length} items</span>
+                                    <div className="season-action-row" role="toolbar" aria-label="Season actions">
+                                        {seasonActions.map((action, index) => {
+                                            const ActionIcon = action.icon
+                                            return (
+                                                <button
+                                                    key={action.key}
+                                                    className={`season-action-button ${
+                                                        focusPane === 'seasonActions' && seasonActionIndex === index ? 'focused' : ''
+                                                    }`}
+                                                    onClick={() => {
+                                                        setFocusPane('seasonActions')
+                                                        setSeasonActionIndex(index)
+                                                        void action.onSelect()
+                                                    }}
+                                                    disabled={action.disabled}
+                                                >
+                                                    <ActionIcon />
+                                                    <span>{action.label}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
                             </div>
 
                             {loadingEpisodes ? (
@@ -650,7 +628,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                 setSelectedEpisodeIndex(index)
                                                 void playEpisode(episode)
                                             }}
-                                        >
+                                            >
                                             <div className="episode-poster">
                                                 {episode.posterUrl ? (
                                                     <LazyImage src={episode.posterUrl} alt={episode.title} />
@@ -677,24 +655,26 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                 )}
                                             </div>
                                             <div className="episode-info">
-                                                <p className="episode-label">
-                                                    {episode.episodeNumber !== undefined
-                                                        ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
-                                                        : `${index + 1}. ${episode.title || 'Untitled'}`}
-                                                </p>
-                                                <div className="episode-meta">
-                                                    {episode.duration && (
-                                                        <span>{formatDuration(episode.duration)}</span>
-                                                    )}
-                                                    {episode.communityRating !== undefined && (
-                                                        <span className="episode-rating">
-                                                            <span className="rating-star">★</span>
-                                                            {episode.communityRating.toFixed(1)}
-                                                        </span>
-                                                    )}
-                                                    {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
-                                                        <span className="episode-status">Resume</span>
-                                                    )}
+                                                <div className="episode-line">
+                                                    <p className="episode-label">
+                                                        {episode.episodeNumber !== undefined
+                                                            ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
+                                                            : `${index + 1}. ${episode.title || 'Untitled'}`}
+                                                    </p>
+                                                    <div className="episode-meta">
+                                                        {episode.duration && (
+                                                            <span>{formatDuration(episode.duration)}</span>
+                                                        )}
+                                                        {episode.communityRating !== undefined && (
+                                                            <span className="episode-rating">
+                                                                <span className="rating-star">★</span>
+                                                                {episode.communityRating.toFixed(1)}
+                                                            </span>
+                                                        )}
+                                                        {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
+                                                            <span className="episode-status">Resume</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 {episode.overview && (
                                                     <p className="episode-description">{episode.overview}</p>

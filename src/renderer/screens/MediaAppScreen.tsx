@@ -534,9 +534,9 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 const contentRect = content.getBoundingClientRect()
 
                 if (sectionRect.top < contentRect.top + padding) {
-                    content.scrollBy({ top: sectionRect.top - contentRect.top - padding, behavior: 'auto' })
+                    content.scrollBy({ top: sectionRect.top - contentRect.top - padding, behavior: 'smooth' })
                 } else if (sectionRect.bottom > contentRect.bottom - padding) {
-                    content.scrollBy({ top: sectionRect.bottom - contentRect.bottom + padding, behavior: 'auto' })
+                    content.scrollBy({ top: sectionRect.bottom - contentRect.bottom + padding, behavior: 'smooth' })
                 }
             }
             return
@@ -1089,6 +1089,20 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     ]
 
     const detailActions = useMemo(() => getDetailActions(), [getDetailActions])
+    const getDetailActionButtonLabel = (label: string): string => {
+        switch (label) {
+            case 'Mark as seen':
+                return 'Seen'
+            case 'Previous episode':
+                return 'Previous'
+            case 'Next episode':
+                return 'Next'
+            case 'Open show':
+                return 'Show'
+            default:
+                return label.split(' ')[0] || label
+        }
+    }
 
     useEffect(() => {
         if (detailFocus !== 'actions') {
@@ -1414,8 +1428,8 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                                 >
                                                     <ActionIcon />
                                                     <span className="sr-only">{action.label}</span>
+                                                    <span className="detail-action-label">{getDetailActionButtonLabel(action.label)}</span>
                                                 </button>
-                                                <span className="detail-action-label">{action.label}</span>
                                             </div>
                                         )
                                     })}
