@@ -231,15 +231,6 @@ function mapItem(item: JellyfinItem): MappedItem {
         ? `${config.jellyfinUrl}/Items/${item.Id}/Images/Primary?tag=${item.ImageTags.Primary}${token ? `&api_key=${token}` : ''}`
         : undefined
 
-    // For seasons, prefer the series poster. Episodes should keep their own artwork.
-    if (itemType === 'season') {
-        if (item.SeriesId && item.SeriesPrimaryImageTag) {
-            posterUrl = `${config.jellyfinUrl}/Items/${item.SeriesId}/Images/Primary?tag=${item.SeriesPrimaryImageTag}${token ? `&api_key=${token}` : ''}`
-        } else if (item.ParentThumbItemId && item.ParentThumbImageTag) {
-            posterUrl = `${config.jellyfinUrl}/Items/${item.ParentThumbItemId}/Images/Primary?tag=${item.ParentThumbImageTag}${token ? `&api_key=${token}` : ''}`
-        }
-    }
-
     const seasonNumber =
         itemType === 'season'
             ? item.IndexNumber ?? item.ParentIndexNumber
@@ -495,6 +486,31 @@ export async function getNextUpItems(): Promise<MappedItem[]> {
     }
 }
 
+/** Get latest media items across Jellyfin libraries */
+export async function getLatestItems(): Promise<MappedItem[]> {
+    if (!ensureAuth()) return []
+
+    try {
+        const api = getClient()
+        const response = await api.get(`/Users/${userId}/Items/Latest`, {
+            params: {
+                Limit: 24,
+                Fields: 'PrimaryImageAspectRatio,Path,MediaSources,UserData,RunTimeTicks,Overview,ImageTags,SeriesId,SeriesName,SeasonName,IndexNumber,ParentIndexNumber,SeriesPrimaryImageTag,ParentThumbItemId,ParentThumbImageTag,BackdropImageTags',
+                ImageTypeLimit: 1,
+                EnableImageTypes: 'Primary,Backdrop,Thumb',
+            },
+            headers: getHeaders(),
+        })
+
+        const items = Array.isArray(response.data) ? response.data : response.data?.Items || []
+        return items.map(mapItem)
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to fetch latest items:', err)
+        return []
+    }
+}
+
 /** Get playback info for an item (gets the stream URL) */
 export async function getPlaybackInfo(
     itemId: string
@@ -709,5 +725,51 @@ export async function reportStopped(
         console.error(
             `[JellyfinPlayback] Stopped failed status=${e?.response?.status || 'unknown'} message=${e?.message || err}`
         )
+    }
+}
+
+export async function markItemPlayed(itemId: string): Promise<void> {
+    if (!ensureAuth()) return
+
+    try {
+        const api = getClient()
+        const normalizedItemId = idToGuid(itemId)
+        await api.post(
+            `/Users/${userId}/PlayedItems/${itemId}?DatePlayed=${encodeURIComponent(new Date().toISOString())}`,
+            null,
+            { headers: getHeaders() }
+        )
+        await api.post(
+            `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+            {
+                PlaybackPositionTicks: 0,
+            },
+            { headers: getHeaders() }
+        )
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to mark item played:', err)
+    }
+}
+
+export async function markItemUnplayed(itemId: string): Promise<void> {
+    if (!ensureAuth()) return
+
+    try {
+        const api = getClient()
+        const normalizedItemId = idToGuid(itemId)
+        await api.delete(`/Users/${userId}/PlayedItems/${itemId}`, {
+            headers: getHeaders(),
+        })
+        await api.post(
+            `/Users/${userId}/Items/${normalizedItemId}/UserData`,
+            {
+                PlaybackPositionTicks: 0,
+            },
+            { headers: getHeaders() }
+        )
+    } catch (err) {
+        handleAuthError(err)
+        console.error('Failed to mark item unplayed:', err)
     }
 }

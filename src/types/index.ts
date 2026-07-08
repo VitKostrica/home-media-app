@@ -85,11 +85,13 @@ export interface ElectronAPI {
         getItemDetails: (itemId: string) => Promise<MediaItem | null>
         getResumeItems: () => Promise<MediaItem[]>
         getNextUpItems: () => Promise<MediaItem[]>
+        getLatestItems: () => Promise<MediaItem[]>
         getPlaybackInfo: (itemId: string) => Promise<{ streamUrl?: string; mediaSourceId?: string }>
         reportPlaybackStart: (itemId: string, positionTicks: number) => Promise<void>
         reportProgress: (itemId: string, positionTicks: number) => Promise<void>
         reportStopped: (itemId: string, positionTicks: number) => Promise<void>
         markPlayed: (itemId: string) => Promise<void>
+        markUnplayed: (itemId: string) => Promise<void>
     }
     configApi: {
         get: () => Promise<AppConfig>

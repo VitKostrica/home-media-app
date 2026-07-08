@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electron', {
         getItemDetails: (itemId: string) => ipcRenderer.invoke('jellyfin:get-item-details', itemId),
         getResumeItems: () => ipcRenderer.invoke('jellyfin:get-resume-items'),
         getNextUpItems: () => ipcRenderer.invoke('jellyfin:get-next-up-items'),
+        getLatestItems: () => ipcRenderer.invoke('jellyfin:get-latest-items'),
         getPlaybackInfo: (itemId: string) => ipcRenderer.invoke('jellyfin:get-playback-info', itemId),
         reportPlaybackStart: (itemId: string, positionTicks: number) => ipcRenderer.invoke('jellyfin:report-playback-start', itemId, positionTicks),
         reportProgress: (itemId: string, positionTicks: number, isPaused?: boolean) =>
@@ -33,6 +34,7 @@ contextBridge.exposeInMainWorld('electron', {
         reportStopped: (itemId: string, positionTicks: number) =>
             ipcRenderer.invoke('jellyfin:report-stopped', itemId, positionTicks),
         markPlayed: (itemId: string) => ipcRenderer.invoke('jellyfin:mark-played', itemId),
+        markUnplayed: (itemId: string) => ipcRenderer.invoke('jellyfin:mark-unplayed', itemId),
     },
 
     configApi: {

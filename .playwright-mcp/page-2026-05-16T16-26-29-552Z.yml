@@ -1,0 +1,21 @@
+- generic [ref=e44]:
+  - generic [ref=e45]:
+    - generic [ref=e46]: 🎬
+    - heading "Connect to Jellyfin" [level=2] [ref=e47]
+    - paragraph [ref=e48]: Sign in to browse your media library
+  - generic [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e51]: Server URL
+      - textbox "Server URL" [ref=e52]:
+        - /placeholder: http://192.168.0.156:8096
+        - text: http://192.168.0.156:8096
+    - generic [ref=e53]:
+      - generic [ref=e54]: Username
+      - textbox "Username" [active] [ref=e55]:
+        - /placeholder: Enter your username
+    - generic [ref=e56]:
+      - generic [ref=e57]: Password
+      - textbox "Password" [ref=e58]:
+        - /placeholder: Enter your password
+  - button "Sign In" [ref=e59] [cursor=pointer]
+  - paragraph [ref=e60]: ↑↓ Navigate fields • Enter to submit

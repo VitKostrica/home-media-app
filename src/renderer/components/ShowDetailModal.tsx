@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '../styles/ShowDetailModal.css'
 import LazyImage from './LazyImage'
 import { useKeybindings } from '../hooks/useKeybindings'
@@ -39,7 +39,7 @@ interface ShowDetailModalProps {
     onPlay: (episode: Episode) => void | Promise<void>
 }
 
-type FocusPane = 'seasons' | 'episodes'
+type FocusPane = 'showActions' | 'seasons' | 'seasonActions' | 'episodes'
 
 function formatDuration(totalSeconds?: number): string {
     if (!totalSeconds || totalSeconds <= 0) {
@@ -58,16 +58,6 @@ function clampIndex(index: number, length: number): number {
     return Math.max(0, Math.min(index, length - 1))
 }
 
-function InfoIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 10v6" />
-            <path d="M12 7.5h.01" />
-        </svg>
-    )
-}
-
 function CheckIcon() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -76,20 +66,12 @@ function CheckIcon() {
     )
 }
 
-function HeartIcon() {
+function ResetIcon() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 21s-7-4.4-9.2-8.7C1 8.8 3.2 6 6.3 6c1.8 0 3.3 1 4.1 2.2C11.2 7 12.7 6 14.5 6c3.1 0 5.3 2.8 3.5 6.3C19 16.6 12 21 12 21z" />
-        </svg>
-    )
-}
-
-function MoreIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="5" r="1.7" />
-            <circle cx="12" cy="12" r="1.7" />
-            <circle cx="12" cy="19" r="1.7" />
+            <path d="M4 7v5h5" />
+            <path d="M20 17a8 8 0 0 1-13.7-5.6L4 12" />
+            <path d="M20 12A8 8 0 0 0 6.7 6.1" />
         </svg>
     )
 }
@@ -103,6 +85,8 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
     const [loadingSeasons, setLoadingSeasons] = useState(false)
     const [loadingEpisodes, setLoadingEpisodes] = useState(false)
     const [focusPane, setFocusPane] = useState<FocusPane>('seasons')
+    const [seasonActionIndex, setSeasonActionIndex] = useState(0)
+    const [actionBusy, setActionBusy] = useState(false)
     const { matches } = useKeybindings()
     const loadRequestRef = useRef(0)
 
@@ -258,10 +242,136 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
         [loadSeason, seasons]
     )
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const reloadSelectedSeason = useCallback(async () => {
+        if (!selectedSeason) {
+            return
+        }
+
+        await loadSeason(selectedSeason, selectedSeasonIndex, {
+            focusPane,
+        })
+    }, [focusPane, loadSeason, selectedSeason, selectedSeasonIndex])
+
+    const markEpisodeList = useCallback(async (episodeList: Episode[], watched: boolean) => {
+        const api = window.electron?.jellyfinApi
+        if (!api || episodeList.length === 0) {
+            return
+        }
+
+        await Promise.all(
+            episodeList.map((episode) =>
+                watched ? api.markPlayed(episode.id) : api.markUnplayed(episode.id)
+            )
+        )
+    }, [])
+
+    const resetShow = useCallback(async () => {
+        if (actionBusy || seasons.length === 0) {
+            return
+        }
+
+        setActionBusy(true)
+        try {
+            const api = window.electron?.jellyfinApi
+            if (!api) {
+                return
+            }
+
+            const seasonEpisodeLists = await Promise.all(
+                seasons.map((season) => api.getEpisodes(show.id, season.id))
+            )
+            await markEpisodeList(seasonEpisodeLists.flat(), false)
+            await reloadSelectedSeason()
+        } catch (err) {
+            console.error('Failed to reset show:', err)
+        } finally {
+            setActionBusy(false)
+        }
+    }, [actionBusy, markEpisodeList, reloadSelectedSeason, seasons, show.id])
+
+    const resetSeason = useCallback(async () => {
+        if (actionBusy || episodes.length === 0) {
+            return
+        }
+
+        setActionBusy(true)
+        try {
+            await markEpisodeList(episodes, false)
+            await reloadSelectedSeason()
+        } catch (err) {
+            console.error('Failed to reset season:', err)
+        } finally {
+            setActionBusy(false)
+        }
+    }, [actionBusy, episodes, markEpisodeList, reloadSelectedSeason])
+
+    const markSeasonSeen = useCallback(async () => {
+        if (actionBusy || episodes.length === 0) {
+            return
+        }
+
+        setActionBusy(true)
+        try {
+            await markEpisodeList(episodes, true)
+            await reloadSelectedSeason()
+        } catch (err) {
+            console.error('Failed to mark season seen:', err)
+        } finally {
+            setActionBusy(false)
+        }
+    }, [actionBusy, episodes, markEpisodeList, reloadSelectedSeason])
+
+    const seasonActions = useMemo(
+        () => [
+            {
+                key: 'mark-season-seen',
+                label: 'Mark season seen',
+                icon: CheckIcon,
+                disabled: actionBusy || loadingEpisodes || episodes.length === 0,
+                onSelect: markSeasonSeen,
+            },
+            {
+                key: 'reset-season',
+                label: 'Reset season',
+                icon: ResetIcon,
+                disabled: actionBusy || loadingEpisodes || episodes.length === 0,
+                onSelect: resetSeason,
+            },
+        ],
+        [actionBusy, episodes.length, loadingEpisodes, markSeasonSeen, resetSeason]
+    )
+
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (matches(e.key, 'back')) {
+            e.preventDefault()
             onClose()
             return
+        }
+
+        if (actionBusy) {
+            return
+        }
+
+        if (focusPane === 'showActions') {
+            if (matches(e.key, 'down')) {
+                e.preventDefault()
+                setFocusPane('seasons')
+                return
+            }
+
+            if (matches(e.key, 'right')) {
+                e.preventDefault()
+                if (selectedSeason) {
+                    setFocusPane('seasonActions')
+                }
+                return
+            }
+
+            if (matches(e.key, 'confirm')) {
+                e.preventDefault()
+                void resetShow()
+                return
+            }
         }
 
         if (focusPane === 'seasons') {
@@ -278,6 +388,11 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
 
             if (matches(e.key, 'up')) {
                 e.preventDefault()
+                if (selectedSeasonIndex === 0) {
+                    setFocusPane('showActions')
+                    return
+                }
+
                 const nextIndex = clampIndex(selectedSeasonIndex - 1, seasons.length)
                 if (nextIndex !== selectedSeasonIndex && seasons[nextIndex]) {
                     void loadSeason(seasons[nextIndex], nextIndex, {
@@ -289,7 +404,10 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
 
             if (matches(e.key, 'right')) {
                 e.preventDefault()
-                if (episodes.length > 0) {
+                if (seasonActions.length > 0) {
+                    setFocusPane('seasonActions')
+                    setSeasonActionIndex(0)
+                } else if (episodes.length > 0) {
                     setFocusPane('episodes')
                 }
                 return
@@ -305,6 +423,43 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
             return
         }
 
+        if (focusPane === 'seasonActions') {
+            if (matches(e.key, 'left')) {
+                e.preventDefault()
+                setFocusPane('seasons')
+                return
+            }
+
+            if (matches(e.key, 'right')) {
+                e.preventDefault()
+                setSeasonActionIndex((prev) => clampIndex(prev + 1, seasonActions.length))
+                return
+            }
+
+            if (matches(e.key, 'up')) {
+                e.preventDefault()
+                setFocusPane('showActions')
+                return
+            }
+
+            if (matches(e.key, 'down')) {
+                e.preventDefault()
+                if (episodes.length > 0) {
+                    setFocusPane('episodes')
+                }
+                return
+            }
+
+            if (matches(e.key, 'confirm')) {
+                e.preventDefault()
+                const action = seasonActions[seasonActionIndex]
+                if (action && !action.disabled) {
+                    void action.onSelect()
+                }
+                return
+            }
+        }
+
         if (matches(e.key, 'down')) {
             e.preventDefault()
             setSelectedEpisodeIndex((prev) => clampIndex(prev + 1, episodes.length))
@@ -313,6 +468,11 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
 
         if (matches(e.key, 'up')) {
             e.preventDefault()
+            if (selectedEpisodeIndex === 0) {
+                setFocusPane('seasonActions')
+                return
+            }
+
             setSelectedEpisodeIndex((prev) => clampIndex(prev - 1, episodes.length))
             return
         }
@@ -330,42 +490,56 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                 void playEpisode(episode)
             }
         }
-    }
+    }, [
+        actionBusy,
+        episodes,
+        focusPane,
+        handleSeasonActivate,
+        markSeasonSeen,
+        matches,
+        onClose,
+        playEpisode,
+        resetSeason,
+        resetShow,
+        seasonActionIndex,
+        seasonActions,
+        seasons,
+        selectedEpisodeIndex,
+        selectedSeason,
+        selectedSeasonIndex,
+    ])
+
+    useEffect(() => {
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [handleKeyDown])
 
     return (
         <div
             className="show-detail-modal"
             onClick={onClose}
-            onKeyDown={handleKeyDown}
             tabIndex={0}
             autoFocus
         >
             <div className="show-detail-card" onClick={(event) => event.stopPropagation()}>
                 <div className="show-detail-view">
                     <div className="show-header">
-                        <div className="show-detail-poster">
-                            {show.posterUrl ? (
-                                <LazyImage src={show.posterUrl} alt={show.title} />
-                            ) : (
-                                <div className="show-detail-poster-placeholder">
-                                    {show.title.charAt(0).toUpperCase()}
-                                </div>
-                            )}
-                        </div>
-
                         <div className="show-detail-info">
                             <h2 className="show-detail-title">
                                 {show.title}
                                 {show.year && <span className="show-detail-year"> ({show.year})</span>}
                             </h2>
+                        </div>
 
-                            {show.overview && (
-                                <p className="show-detail-overview">{show.overview}</p>
-                            )}
-
-                            <p className="show-detail-nav-hint">
-                                ↑ ↓ seasons / episodes • ← → switch pane • Enter play • Back close
-                            </p>
+                        <div className="show-actions">
+                            <button
+                                className={`show-action-button ${focusPane === 'showActions' ? 'focused' : ''}`}
+                                onClick={() => { void resetShow() }}
+                                disabled={actionBusy || seasons.length === 0}
+                            >
+                                <ResetIcon />
+                                <span>Reset show</span>
+                            </button>
                         </div>
                     </div>
 
@@ -385,28 +559,18 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                     {seasons.map((season, index) => (
                                         <div
                                             key={season.id}
-                                            className={`season-card ${index === selectedSeasonIndex && focusPane === 'seasons' ? 'focused' : ''}`}
+                                            className={`season-card ${index === selectedSeasonIndex ? 'selected' : ''} ${
+                                                index === selectedSeasonIndex && focusPane === 'seasons' ? 'focused' : ''
+                                            }`}
                                             onClick={() => {
                                                 setSelectedSeasonIndex(index)
                                                 void handleSeasonActivate(index, true)
                                             }}
                                         >
-                                            <div className="season-poster">
-                                                {season.posterUrl ? (
-                                                    <LazyImage src={season.posterUrl} alt={season.title} />
-                                                ) : (
-                                                    <div className="season-poster-placeholder">
-                                                        {season.seasonNumber !== undefined ? `S${season.seasonNumber}` : 'S?'}
-                                                    </div>
-                                                )}
-                                            </div>
                                             <div className="season-info">
                                                 <p className="season-title">
                                                     {season.seasonNumber !== undefined ? `Season ${season.seasonNumber}` : season.title}
                                                 </p>
-                                                {season.overview && (
-                                                    <p className="season-description">{season.overview}</p>
-                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -420,22 +584,33 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                     <h3 className="panel-title">
                                         {selectedSeason?.title || 'Episodes'}
                                     </h3>
-                                    {selectedSeason?.seasonNumber !== undefined && (
-                                        <p className="panel-subtitle">
-                                            Season {selectedSeason.seasonNumber}
-                                        </p>
-                                    )}
                                 </div>
-                                <span className="panel-meta">{episodes.length} items</span>
+                                <div className="episode-header-tools">
+                                    <span className="panel-meta">{episodes.length} items</span>
+                                    <div className="season-action-row" role="toolbar" aria-label="Season actions">
+                                        {seasonActions.map((action, index) => {
+                                            const ActionIcon = action.icon
+                                            return (
+                                                <button
+                                                    key={action.key}
+                                                    className={`season-action-button ${
+                                                        focusPane === 'seasonActions' && seasonActionIndex === index ? 'focused' : ''
+                                                    }`}
+                                                    onClick={() => {
+                                                        setFocusPane('seasonActions')
+                                                        setSeasonActionIndex(index)
+                                                        void action.onSelect()
+                                                    }}
+                                                    disabled={action.disabled}
+                                                >
+                                                    <ActionIcon />
+                                                    <span>{action.label}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
                             </div>
-
-                            {selectedSeason?.overview && (
-                                <div className="selected-season-summary">
-                                    <p className="selected-season-overview">
-                                        {selectedSeason.overview}
-                                    </p>
-                                </div>
-                            )}
 
                             {loadingEpisodes ? (
                                 <p className="panel-empty">Loading episodes...</p>
@@ -453,7 +628,7 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                 setSelectedEpisodeIndex(index)
                                                 void playEpisode(episode)
                                             }}
-                                        >
+                                            >
                                             <div className="episode-poster">
                                                 {episode.posterUrl ? (
                                                     <LazyImage src={episode.posterUrl} alt={episode.title} />
@@ -480,42 +655,30 @@ const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose, onPlay
                                                 )}
                                             </div>
                                             <div className="episode-info">
-                                                <p className="episode-label">
-                                                    {episode.episodeNumber !== undefined
-                                                        ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
-                                                        : `${index + 1}. ${episode.title || 'Untitled'}`}
-                                                </p>
-                                                <div className="episode-meta">
-                                                    {episode.duration && (
-                                                        <span>{formatDuration(episode.duration)}</span>
-                                                    )}
-                                                    {episode.communityRating !== undefined && (
-                                                        <span className="episode-rating">
-                                                            <span className="rating-star">★</span>
-                                                            {episode.communityRating.toFixed(1)}
-                                                        </span>
-                                                    )}
-                                                    {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
-                                                        <span className="episode-status">Resume</span>
-                                                    )}
+                                                <div className="episode-line">
+                                                    <p className="episode-label">
+                                                        {episode.episodeNumber !== undefined
+                                                            ? `${episode.episodeNumber}. ${episode.title || 'Untitled'}`
+                                                            : `${index + 1}. ${episode.title || 'Untitled'}`}
+                                                    </p>
+                                                    <div className="episode-meta">
+                                                        {episode.duration && (
+                                                            <span>{formatDuration(episode.duration)}</span>
+                                                        )}
+                                                        {episode.communityRating !== undefined && (
+                                                            <span className="episode-rating">
+                                                                <span className="rating-star">★</span>
+                                                                {episode.communityRating.toFixed(1)}
+                                                            </span>
+                                                        )}
+                                                        {episode.resumePosition && episode.resumePosition > 0 && !episode.watched && (
+                                                            <span className="episode-status">Resume</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 {episode.overview && (
                                                     <p className="episode-description">{episode.overview}</p>
                                                 )}
-                                            </div>
-                                            <div className="episode-actions" aria-hidden="true">
-                                                <span className="episode-action-icon">
-                                                    <InfoIcon />
-                                                </span>
-                                                <span className="episode-action-icon">
-                                                    <CheckIcon />
-                                                </span>
-                                                <span className="episode-action-icon">
-                                                    <HeartIcon />
-                                                </span>
-                                                <span className="episode-action-icon">
-                                                    <MoreIcon />
-                                                </span>
                                             </div>
                                         </div>
                                     ))}

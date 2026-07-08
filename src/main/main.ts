@@ -225,6 +225,10 @@ ipcMain.handle('jellyfin:get-next-up-items', async () => {
     return await jellyfinService.getNextUpItems()
 })
 
+ipcMain.handle('jellyfin:get-latest-items', async () => {
+    return await jellyfinService.getLatestItems()
+})
+
 ipcMain.handle('jellyfin:get-playback-info', async (_, itemId: string) => {
     console.log('[IPC] jellyfin:get-playback-info called with itemId:', itemId)
     const result = await jellyfinService.getPlaybackInfo(itemId)
@@ -245,7 +249,11 @@ ipcMain.handle('jellyfin:report-stopped', async (_, itemId: string, positionTick
 })
 
 ipcMain.handle('jellyfin:mark-played', async (_, itemId: string) => {
-    await jellyfinService.reportStopped(itemId, 0, undefined, { markPlayed: true })
+    await jellyfinService.markItemPlayed(itemId)
+})
+
+ipcMain.handle('jellyfin:mark-unplayed', async (_, itemId: string) => {
+    await jellyfinService.markItemUnplayed(itemId)
 })
 
 // ── Player IPC ───────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import '../styles/MediaAppScreen.css'
 import MediaCard from '../components/MediaCard'
 import JellyfinLogin from '../components/JellyfinLogin'
@@ -41,12 +41,13 @@ interface MediaAppScreenProps {
 type ActiveTab = 0 | 1 | 2
 type SidebarIndex = 0 | 1 | 2 | 3
 type FocusArea = 'sidebar' | 'content'
-type ContinueRow = 'continue' | 'next'
+type ContinueRow = 'continue' | 'next' | 'latest'
 type DetailFocus = 'play' | 'actions'
 
 const COLUMNS = 6
 const CONTINUE_WATCHING_ROW_LIMIT = 6
 const NEXT_UP_ROW_LIMIT = 6
+const LATEST_ROW_LIMIT = 7
 const NEXT_UP_RETRY_DELAY_MS = 400
 
 function sleep(ms: number): Promise<void> {
@@ -167,6 +168,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     const [error, setError] = useState<string | null>(null)
     const [continueWatchingItems, setContinueWatchingItems] = useState<MediaItem[]>([])
     const [nextUpItems, setNextUpItems] = useState<MediaItem[]>([])
+    const [latestItems, setLatestItems] = useState<MediaItem[]>([])
     const [sidebarIndex, setSidebarIndex] = useState<SidebarIndex>(1)
     const [focusedArea, setFocusedArea] = useState<FocusArea>('content')
     const [continueRow, setContinueRow] = useState<ContinueRow>('continue')
@@ -236,6 +238,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     if (requestId !== fetchRequestIdRef.current) {
                         return
                     }
+                    const latestItems = await api.getLatestItems()
+                    if (requestId !== fetchRequestIdRef.current) {
+                        return
+                    }
 
                     if (options?.retryNextUp && nextUpItems.length === 0) {
                         await sleep(NEXT_UP_RETRY_DELAY_MS)
@@ -255,8 +261,12 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     const nextUpUnique = (nextUpItems || []).filter(
                         (item) => item?.id && !seenIds.has(item.id)
                     )
+                    nextUpUnique.forEach((item) => seenIds.add(item.id))
+                    const latestUnique = (latestItems || []).filter(
+                        (item) => item?.id && !seenIds.has(item.id)
+                    )
 
-                    const episodeItems = [...resumeUnique, ...nextUpUnique].filter(
+                    const episodeItems = [...resumeUnique, ...nextUpUnique, ...latestUnique].filter(
                         (item) => item.type === 'episode' && !!(item as { seriesId?: string }).seriesId
                     ) as MediaItem[]
                     const uniqueSeriesIds = [
@@ -289,18 +299,22 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
                     const continueRowItems = attachSeriesPoster(resumeUnique.slice(0, CONTINUE_WATCHING_ROW_LIMIT))
                     const nextUpRowItems = attachSeriesPoster(nextUpUnique.slice(0, NEXT_UP_ROW_LIMIT))
+                    const latestRowItems = attachSeriesPoster(latestUnique.slice(0, LATEST_ROW_LIMIT))
 
                     setContinueWatchingItems(continueRowItems)
                     setNextUpItems(nextUpRowItems)
-                    data = [...continueRowItems, ...nextUpRowItems]
+                    setLatestItems(latestRowItems)
+                    data = [...continueRowItems, ...nextUpRowItems, ...latestRowItems]
                 } else if (tabIndex === 1) {
                     data = await api.getMovies()
                     setContinueWatchingItems([])
                     setNextUpItems([])
+                    setLatestItems([])
                 } else {
                     data = await api.getSeries()
                     setContinueWatchingItems([])
                     setNextUpItems([])
+                    setLatestItems([])
                 }
 
                 if (requestId !== fetchRequestIdRef.current) {
@@ -410,11 +424,16 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 setContinueIndex((prev) => Math.min(prev, Math.max(continueWatchingItems.length - 1, 0)))
             } else if (continueRow === 'next' && nextUpItems.length > 0) {
                 setContinueIndex((prev) => Math.min(prev, Math.max(nextUpItems.length - 1, 0)))
+            } else if (continueRow === 'latest' && latestItems.length > 0) {
+                setContinueIndex((prev) => Math.min(prev, Math.max(latestItems.length - 1, 0)))
             } else if (continueWatchingItems.length > 0) {
                 setContinueRow('continue')
                 setContinueIndex(0)
             } else if (nextUpItems.length > 0) {
                 setContinueRow('next')
+                setContinueIndex(0)
+            } else if (latestItems.length > 0) {
+                setContinueRow('latest')
                 setContinueIndex(0)
             }
             return
@@ -430,6 +449,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         error,
         isAuthenticated,
         items.length,
+        latestItems.length,
         loading,
         nextUpItems.length,
     ])
@@ -501,15 +521,32 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     }, [selectedItem?.id, selectedItem?.seriesId, selectedItem?.type, showDetail])
 
     useEffect(() => {
-        if (focusedArea !== 'content' || activeTab === 0 || !contentRef.current) {
+        const content = contentRef.current
+        if (focusedArea !== 'content' || !content) {
             return
         }
 
-        const focused = contentRef.current.querySelector('.media-card.focused')
+        if (activeTab === 0) {
+            const focusedSection = content.querySelector<HTMLElement>('.media-section.focused')
+            if (focusedSection) {
+                const padding = 18
+                const sectionRect = focusedSection.getBoundingClientRect()
+                const contentRect = content.getBoundingClientRect()
+
+                if (sectionRect.top < contentRect.top + padding) {
+                    content.scrollBy({ top: sectionRect.top - contentRect.top - padding, behavior: 'smooth' })
+                } else if (sectionRect.bottom > contentRect.bottom - padding) {
+                    content.scrollBy({ top: sectionRect.bottom - contentRect.bottom + padding, behavior: 'smooth' })
+                }
+            }
+            return
+        }
+
+        const focused = content.querySelector('.media-item-wrapper.focused')
         if (focused) {
             focused.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' })
         }
-    }, [activeTab, focusedArea, gridIndex])
+    }, [activeTab, continueIndex, continueRow, focusedArea, gridIndex])
 
     const checkAuth = async () => {
         try {
@@ -801,7 +838,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     event.preventDefault()
                     if (detailFocus === 'play' && actionableIndexes.length > 0) {
                         setDetailFocus('actions')
-                        setDetailActionIndex(0)
+                        setDetailActionIndex(actionableIndexes[0])
                     }
                     return
                 }
@@ -817,19 +854,25 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                 if (detailFocus === 'actions') {
                     if (matches(event.key, 'left')) {
                         event.preventDefault()
-                        setDetailActionIndex((prev) => Math.max(0, prev - 1))
+                        setDetailActionIndex((prev) => {
+                            const currentEnabledIndex = Math.max(0, actionableIndexes.indexOf(prev))
+                            return actionableIndexes[Math.max(0, currentEnabledIndex - 1)] ?? prev
+                        })
                         return
                     }
 
                     if (matches(event.key, 'right')) {
                         event.preventDefault()
-                        setDetailActionIndex((prev) => Math.min(actionableIndexes.length - 1, prev + 1))
+                        setDetailActionIndex((prev) => {
+                            const currentEnabledIndex = Math.max(0, actionableIndexes.indexOf(prev))
+                            return actionableIndexes[Math.min(actionableIndexes.length - 1, currentEnabledIndex + 1)] ?? prev
+                        })
                         return
                     }
 
                     if (matches(event.key, 'confirm')) {
                         event.preventDefault()
-                        const currentAction = detailActions[actionableIndexes[detailActionIndex]]
+                        const currentAction = detailActions[detailActionIndex]
                         if (currentAction && !currentAction.disabled) {
                             currentAction.onSelect()
                         }
@@ -919,7 +962,12 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
             }
 
             if (activeTab === 0) {
-                const currentList = continueRow === 'continue' ? continueWatchingItems : nextUpItems
+                const currentList =
+                    continueRow === 'continue'
+                        ? continueWatchingItems
+                        : continueRow === 'next'
+                            ? nextUpItems
+                            : latestItems
                 const currentMax = Math.max(currentList.length - 1, 0)
                 const safeIndex = Math.min(continueIndex, currentMax)
 
@@ -936,13 +984,19 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     if (continueRow === 'continue' && nextUpItems.length > 0) {
                         setContinueRow('next')
                         setContinueIndex(0)
+                    } else if (continueRow !== 'latest' && latestItems.length > 0) {
+                        setContinueRow('latest')
+                        setContinueIndex(0)
                     }
                     return
                 }
 
                 if (matches(event.key, 'up')) {
                     event.preventDefault()
-                    if (continueRow === 'next' && continueWatchingItems.length > 0) {
+                    if (continueRow === 'latest' && nextUpItems.length > 0) {
+                        setContinueRow('next')
+                        setContinueIndex(0)
+                    } else if (continueRow !== 'continue' && continueWatchingItems.length > 0) {
                         setContinueRow('continue')
                         setContinueIndex(0)
                     }
@@ -953,7 +1007,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                     event.preventDefault()
                     const item = currentList[safeIndex]
                     if (item) {
-                        void launchVlc(item)
+                        openItem(item)
                     }
                     return
                 }
@@ -996,15 +1050,20 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
         },
         [
             activeTab,
+            closeDetailViews,
             continueIndex,
             continueRow,
             continueWatchingItems,
+            detailActionIndex,
+            detailFocus,
             focusedArea,
+            getDetailActions,
             gridIndex,
             handleClosePlayer,
             handlePlay,
             isAuthenticated,
             items,
+            latestItems,
             launchVlc,
             matches,
             nextUpItems,
@@ -1024,18 +1083,43 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
 
     const sidebarItems = [
         { label: 'Home', icon: HomeIcon },
-        { label: 'Continue Watching', icon: ContinueIcon },
+        { label: 'Continue', icon: ContinueIcon },
         { label: 'Movies', icon: MoviesIcon },
         { label: 'Shows', icon: ShowsIcon },
     ]
 
-    const detailActions = getDetailActions()
+    const detailActions = useMemo(() => getDetailActions(), [getDetailActions])
+    const getDetailActionButtonLabel = (label: string): string => {
+        switch (label) {
+            case 'Mark as seen':
+                return 'Seen'
+            case 'Previous episode':
+                return 'Previous'
+            case 'Next episode':
+                return 'Next'
+            case 'Open show':
+                return 'Show'
+            default:
+                return label.split(' ')[0] || label
+        }
+    }
 
     useEffect(() => {
-        if (detailFocus === 'actions' && detailActionIndex > Math.max(detailActions.length - 1, 0)) {
-            setDetailActionIndex(0)
+        if (detailFocus !== 'actions') {
+            return
         }
-    }, [detailActionIndex, detailActions.length, detailFocus])
+
+        const actionableIndex = detailActions.findIndex((action, index) => index >= detailActionIndex && !action.disabled)
+        if (actionableIndex >= 0) {
+            setDetailActionIndex(actionableIndex)
+            return
+        }
+
+        const fallbackIndex = detailActions.findIndex((action) => !action.disabled)
+        if (fallbackIndex >= 0) {
+            setDetailActionIndex(fallbackIndex)
+        }
+    }, [detailActionIndex, detailActions, detailFocus])
 
     if (!isAuthenticated) {
         return <JellyfinLogin onSuccess={() => setIsAuthenticated(true)} />
@@ -1056,7 +1140,10 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
     return (
         <div className="media-app-screen">
             <div className="media-app-shell">
-                <aside className="media-sidebar" aria-label="Media navigation">
+                <aside
+                    className={`media-sidebar ${focusedArea === 'sidebar' ? 'expanded' : ''}`}
+                    aria-label="Media navigation"
+                >
                     <button
                         className={`sidebar-button sidebar-home ${
                             focusedArea === 'sidebar' && sidebarIndex === 0 ? 'focused' : ''
@@ -1065,7 +1152,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                         aria-label="Home"
                     >
                         <HomeIcon />
-                        <span className="sr-only">Home</span>
+                        <span className="sidebar-label">Home</span>
                     </button>
 
                     <div className="sidebar-divider" />
@@ -1089,7 +1176,7 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     aria-label={item.label}
                                 >
                                     <item.icon />
-                                    <span className="sr-only">{item.label}</span>
+                                    <span className="sidebar-label">{item.label}</span>
                                 </button>
                             )
                         })}
@@ -1179,7 +1266,40 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                         </section>
                                     )}
 
-                                    {continueWatchingItems.length === 0 && nextUpItems.length === 0 && (
+                                    {latestItems.length > 0 && (
+                                        <section className={`media-section ${continueRow === 'latest' ? 'focused' : ''}`}>
+                                            <div className="section-header">
+                                                <h2 className="section-title">
+                                                    <span className="section-title-icon" aria-hidden="true">
+                                                        <MoviesIcon />
+                                                    </span>
+                                                    Latest
+                                                </h2>
+                                                <span className="section-meta">{latestItems.length} items</span>
+                                            </div>
+                                            <div className="media-grid">
+                                                {latestItems.map((item, index) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className={`media-item-wrapper ${
+                                                            continueRow === 'latest' && continueIndex === index ? 'focused' : ''
+                                                        }`}
+                                                    >
+                                                        <MediaCard
+                                                            item={item}
+                                                            onSelect={() => {
+                                                                focusContinueWatching('latest', index)
+                                                                openItem(item)
+                                                            }}
+                                                            showProgress={true}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {continueWatchingItems.length === 0 && nextUpItems.length === 0 && latestItems.length === 0 && (
                                         <div className="empty-state">
                                             <p>No media found in your library.</p>
                                         </div>
@@ -1285,23 +1405,32 @@ const MediaAppScreen: React.FC<MediaAppScreenProps> = ({ onNavigate }) => {
                                     {detailActions.map((action, index) => {
                                         const ActionIcon = action.icon
                                         return (
-                                            <button
+                                            <div
                                                 key={action.key}
-                                                className={`icon-action-button ${
+                                                className={`detail-action-item ${
                                                     detailFocus === 'actions' && detailActionIndex === index ? 'focused' : ''
                                                 } ${action.disabled ? 'disabled' : ''}`}
-                                                onClick={() => {
-                                                    if (!action.disabled) {
-                                                        action.onSelect()
-                                                    }
-                                                }}
-                                                disabled={action.disabled}
-                                                aria-label={action.label}
-                                                title={action.label}
                                             >
-                                                <ActionIcon />
-                                                <span className="sr-only">{action.label}</span>
-                                            </button>
+                                                <button
+                                                    className={`icon-action-button ${
+                                                        detailFocus === 'actions' && detailActionIndex === index ? 'focused' : ''
+                                                    } ${action.disabled ? 'disabled' : ''}`}
+                                                    onClick={() => {
+                                                        if (!action.disabled) {
+                                                            setDetailFocus('actions')
+                                                            setDetailActionIndex(index)
+                                                            action.onSelect()
+                                                        }
+                                                    }}
+                                                    disabled={action.disabled}
+                                                    aria-label={action.label}
+                                                    title={action.label}
+                                                >
+                                                    <ActionIcon />
+                                                    <span className="sr-only">{action.label}</span>
+                                                    <span className="detail-action-label">{getDetailActionButtonLabel(action.label)}</span>
+                                                </button>
+                                            </div>
                                         )
                                     })}
                                 </div>
