@@ -21,6 +21,7 @@ let playbackStartedAtMs = 0
 let playbackStartPositionSec = 0
 let currentDurationSec = 0
 let stopRequestedByUser = false
+let autoExitTriggered = false
 let currentPlaySessionId = ''
 let lastKnownPositionSec = 0
 let currentPlayerType: PlayerType | null = null
@@ -59,6 +60,7 @@ function resetPlaybackState() {
     playbackStartPositionSec = 0
     currentDurationSec = 0
     stopRequestedByUser = false
+    autoExitTriggered = false
     currentPlaySessionId = ''
     lastKnownPositionSec = 0
     currentPlayerType = null
@@ -196,6 +198,35 @@ function didFinishPlayback(positionTicks: number): boolean {
     return positionTicks >= Math.floor(durationTicks * COMPLETE_THRESHOLD_RATIO)
 }
 
+function shouldAutoExitAfterFinishedPlayback(): boolean {
+    if (currentPlayerType !== 'vlc' || autoExitTriggered) {
+        return false
+    }
+
+    if (currentVlcState === 'ended') {
+        return true
+    }
+
+    // Some VLC builds report "stopped" at EOF instead of "ended".
+    return (
+        didFinishPlayback(getBestKnownPositionTicks()) &&
+        (currentVlcState === 'stopped' || currentVlcState === 'ended')
+    )
+}
+
+/** Quit VLC after natural end without treating it as a manual Back stop. */
+function quitPlayerAfterNaturalEnd() {
+    if (autoExitTriggered || !currentPlayer || currentPlayer.killed) {
+        return
+    }
+
+    autoExitTriggered = true
+    console.log(
+        `[PlaybackDebug] Auto-exiting player after natural end state=${currentVlcState || 'unknown'} sec=${ticksToSec(getBestKnownPositionTicks())}`
+    )
+    currentPlayer.kill()
+}
+
 async function refreshVlcPositionIfPossible(): Promise<void> {
     if (currentPlayerType === 'vlc') {
         await requestVlcStatusSnapshot(300)
@@ -206,6 +237,11 @@ function startProgressReporting() {
     clearProgressInterval()
     progressInterval = setInterval(async () => {
         await refreshVlcPositionIfPossible()
+
+        if (shouldAutoExitAfterFinishedPlayback()) {
+            quitPlayerAfterNaturalEnd()
+            return
+        }
 
         const paused = currentPlayerType === 'vlc' && currentVlcState === 'paused'
         console.log(
@@ -239,6 +275,7 @@ export function launchPlayer(
     currentPlayerType = type
     currentItemId = jellyfinItemId || null
     stopRequestedByUser = false
+    autoExitTriggered = false
     currentDurationSec = durationSec && durationSec > 0 ? durationSec : 0
     currentPlaySessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     lastKnownPositionSec = startPosition && startPosition > 0 ? startPosition : 0
@@ -260,11 +297,13 @@ export function launchPlayer(
         } else {
             // VLC - use the HTTP interface so we can poll the current time and
             // playback state directly instead of estimating with wall-clock drift.
+            // --play-and-exit closes VLC when the file finishes so the app can restore.
             currentVlcHttpPort = 4200 + Math.floor(Math.random() * 2000)
             currentVlcHttpPassword = Math.random().toString(36).slice(2, 12)
 
             args = [
                 '--fullscreen',
+                '--play-and-exit',
                 '--extraintf=http',
                 '--http-host=127.0.0.1',
                 `--http-port=${currentVlcHttpPort}`,
